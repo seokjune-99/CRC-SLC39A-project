@@ -114,7 +114,7 @@ res = viper(rna_data, coad_regulon)
 rownames(res) = paste0('protein_',rownames(res))
 res = data.frame(t(res))
 sc@meta.data[,'CDX2PA'] = res[,'protein_CDX2']
-#qsave(sc,'/github/singlecell_data/SG/data/SG_processed_data.qs')
+#saveRDS(sc,'/github/singlecell_data/SG/data/SG_processed_data.rds')
 
 
 ######## Main figure 3a
