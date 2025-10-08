@@ -1,1 +1,234 @@
+library(DescTools)
+library(Ternary)
+library(tidyverse)
+library(ggpubr)
+library(MOFA2)
+library(reticulate)
+library(ParetoTI)
+library(readxl)
+library(progress)
+library(gprofiler2)
+library(ggalluvial)
+library(patchwork)
+library(dplyr)
+library(tidyr)
+library(cowplot)
+library(GO.db)
+library(genefu)
+library(msigdbr)
+library(org.Hs.eg.db)
+library(CMScaller)
 
+######## Load data
+tpm = read.csv('/github/model_data/TCGA/COAD_tpm.csv', header = TRUE, row.names = 1)
+cnv = read.csv('/github/model_data/TCGA/CDA_TCGA_COAD_cnv_gistic2.csv', header = TRUE, row.names = 1)
+meth_body = read.csv('/github/model_data/TCGA/CDA_TCGA_COAD_meth450_bv-genebody-mean-value.csv', header = TRUE, row.names = 1)
+meth_prom = read.csv('/github/model_data/TCGA/CDA_TCGA_COAD_meth450_bv-promoter-mean-value.csv', header = TRUE, row.names = 1)
+
+dir = '/github/model_data/TCGA/'
+file_1 = list.files(path = dir,pattern="*mutation.csv")
+file_1 = file_1[-c(4,8)]
+file_2 = list.files(path = dir,pattern="*insertion.csv")
+file_3 = list.files(path = dir,pattern="*deletion.csv")
+file_1_bool = grep('bool',file_1,value = T)
+file_2_bool = grep('bool',file_2,value = T)
+file_3_bool = grep('bool',file_3,value = T)
+setwd(dir)
+mut_1 = lapply(file_1_bool, read.csv)
+mut_2 = lapply(file_2_bool, read.csv)
+mut_3 = lapply(file_3_bool, read.csv)
+test_list = list(mut_1[[1]],mut_1[[2]],mut_1[[3]],mut_2[[1]],mut_2[[2]],mut_3[[1]],mut_3[[2]])
+df_list = list()
+for(i in 1:7){
+  test_df = test_list[[i]]
+  rownames(test_df) = test_df[,1]
+  test_df = test_df[,-1]
+  df_list[[i]] = test_df
+}
+all_rows = unique(unlist(lapply(df_list, rownames)))
+all_cols = unique(unlist(lapply(df_list, colnames)))
+final_mat = matrix(NA, nrow = length(all_rows), ncol = length(all_cols))
+rownames(final_mat) = all_rows
+colnames(final_mat) = all_cols
+for(i in seq_along(df_list)) {
+  final_mat[rownames(df_list[[i]]), colnames(df_list[[i]])][is.na(final_mat[rownames(df_list[[i]]), colnames(df_list[[i]])])] = 0
+  final_mat[rownames(df_list[[i]]), colnames(df_list[[i]])] = final_mat[rownames(df_list[[i]]), colnames(df_list[[i]])] + as.matrix(df_list[[i]])
+}
+final_mat[is.na(final_mat)] = 0
+for(i in 1:ncol(final_mat)){
+  index = which(final_mat[,i] >= 1)
+  final_mat[,i][index] = 1
+}
+final_mat = data.frame(t(final_mat))
+res = c()
+for(i in 1:ncol(final_mat)){
+  yes_mutation = length(which(final_mat[,i] == 1))
+  res = c(res,yes_mutation)
+}
+selected_gene = colnames(final_mat)[which(res > 0.01 * 288)]
+mut = t(final_mat[,selected_gene])
+
+
+
+######## Driver gene + SLC gene
+driver_db = read.csv('/github/model_data/Drivergenes/All_cancer_gene_db.csv', 
+                     header = TRUE, row.names = 1)
+cancer_idx  = which(str_detect(driver_db$Cancer_abbr, 'COAD|PanCancer'))
+driver_idx  = which(str_detect(driver_db$Driver.Level,'4.0'))
+freq_idx    = which(driver_db$Total >= 3)
+driver_genes = rownames(driver_db)[Reduce(intersect, list(cancer_idx, driver_idx, freq_idx))]
+
+filter_genes = function(df){
+  test = rownames(df)
+  SLC_list = grep('SLC',test,value = T)
+  driver_list = test[which(test %in% driver_genes)]
+  total_gene = unique(c(SLC_list,driver_list))
+  df = df[total_gene,]
+  return(df)
+}
+mut = filter_genes(mut)
+tpm = filter_genes(tpm)
+cnv = filter_genes(cnv)
+meth_body = filter_genes(meth_body)
+meth_prom = filter_genes(meth_prom)
+rownames(mut) = paste0("Mut_", rownames(mut))
+rownames(tpm) = paste0("TPM_", rownames(tpm))
+rownames(cnv) = paste0("CNV_", rownames(cnv))
+rownames(meth_body) = paste0("Meth_body_", rownames(meth_body))
+rownames(meth_prom) = paste0("Meth_prom_", rownames(meth_prom))
+only_slc = function(df){
+  slc_rows = grep("SLC", rownames(df), value = TRUE)
+  slc_rows = substr(slc_rows, 5, nchar(slc_rows))
+  del = c(grep("P", slc_rows), grep("AS", slc_rows))
+  if(length(del) > 0) df = df[-del, , drop = FALSE]
+  return(df)
+}
+tpm = only_slc(tpm)
+cnv = only_slc(cnv)
+mut = only_slc(mut)
+meth_body = only_slc(meth_body)
+meth_prom = only_slc(meth_prom)
+common_samples = Reduce(intersect, list(
+  colnames(tpm), colnames(cnv), colnames(mut),
+  colnames(meth_body), colnames(meth_prom)
+))
+tpm = as.matrix(tpm[, common_samples])
+cnv = as.matrix(cnv[, common_samples])
+mut = as.matrix(mut[, common_samples])
+meth_body = as.matrix(meth_body[, common_samples])
+meth_prom = as.matrix(meth_prom[, common_samples])
+
+
+
+######## MOFA
+MOFAobject = create_mofa(list("TPM" = tpm,"Mutation" = mut,"CNV" = cnv,"Meth_pro" = meth_prom,"Meth_bod" = meth_body))
+data_opts = get_default_data_options(MOFAobject)
+model_opts = get_default_model_options(MOFAobject)
+model_opts$num_factors = 10
+model_opts$likelihoods["Mutation"] = "bernoulli"
+train_opts = get_default_training_options(MOFAobject)
+train_opts$convergence_mode = "slow"
+train_opts$maxiter = 10000
+MOFAobject = prepare_mofa(object=MOFAobject, data_options=data_opts, model_options=model_opts, training_options=train_opts )
+MOFAobject.trained = run_mofa(MOFAobject)
+#saveRDS(MOFAobject.trained,'/github/model_data/MOFA/MOFA_model.rds')
+
+
+######## Supple figure 1b
+pdf("/github/Figure/Supple/Fig1/b_Factor1_features.pdf", width = 16, height = 10)
+plot_top_weights(MOFAobject.trained, view = "TPM", factor = 1, sign = 'positive', nfeatures = 30, scale = T) +
+  plot_top_weights(MOFAobject.trained, view = "TPM", factor = 1, sign = 'negative', nfeatures = 30, scale = T)  + 
+  plot_top_weights(MOFAobject.trained, view = "Mutation", factor = 1, sign = 'positive', nfeatures = 30, scale = T) +
+  plot_top_weights(MOFAobject.trained, view = "Mutation", factor = 1, sign = 'negative', nfeatures = 30, scale = T) +
+  plot_top_weights(MOFAobject.trained, view = "CNV", factor = 1, sign = 'positive', nfeatures = 30, scale = T) +
+  plot_top_weights(MOFAobject.trained, view = "CNV", factor = 1, sign = 'negative', nfeatures = 30, scale = T)  + 
+  plot_top_weights(MOFAobject.trained, view = "Meth_pro", factor = 1, sign = 'positive', nfeatures = 30, scale = T) +
+  plot_top_weights(MOFAobject.trained, view = "Meth_pro", factor = 1, sign = 'negative', nfeatures = 30, scale = T) +
+  plot_top_weights(MOFAobject.trained, view = "Meth_bod", factor = 1, sign = 'positive', nfeatures = 30, scale = T) +
+  plot_top_weights(MOFAobject.trained, view = "Meth_bod", factor = 1, sign = 'negative', nfeatures = 30, scale = T) 
+dev.off()
+######## Supple figure 1c
+pdf("/github/Figure/Supple/Fig1/c_Factor4_features.pdf", width = 16, height = 10)
+plot_top_weights(MOFAobject.trained, view = "TPM", factor = 4, sign = 'positive', nfeatures = 30, scale = T) +
+  plot_top_weights(MOFAobject.trained, view = "TPM", factor = 4, sign = 'negative', nfeatures = 30, scale = T)  + 
+  plot_top_weights(MOFAobject.trained, view = "Mutation", factor = 4, sign = 'positive', nfeatures = 30, scale = T) +
+  plot_top_weights(MOFAobject.trained, view = "Mutation", factor = 4, sign = 'negative', nfeatures = 30, scale = T) +
+  plot_top_weights(MOFAobject.trained, view = "CNV", factor = 4, sign = 'positive', nfeatures = 30, scale = T) +
+  plot_top_weights(MOFAobject.trained, view = "CNV", factor = 4, sign = 'negative', nfeatures = 30, scale = T)  + 
+  plot_top_weights(MOFAobject.trained, view = "Meth_pro", factor = 4, sign = 'positive', nfeatures = 30, scale = T) +
+  plot_top_weights(MOFAobject.trained, view = "Meth_pro", factor = 4, sign = 'negative', nfeatures = 30, scale = T) +
+  plot_top_weights(MOFAobject.trained, view = "Meth_bod", factor = 4, sign = 'positive', nfeatures = 30, scale = T) +
+  plot_top_weights(MOFAobject.trained, view = "Meth_bod", factor = 4, sign = 'negative', nfeatures = 30, scale = T) 
+dev.off()
+
+
+
+######## Pareto TI (archetype)
+data = MOFAobject.trained@expectations$Z$group1
+res_1 = k_fit_pch(t(data[,c(1,2)]), ks = 2:3, check_installed = T,
+                  bootstrap = T, bootstrap_N = 200, maxiter = 1000,
+                  bootstrap_type = "m", seed = 2543, 
+                  volume_ratio = "t_ratio", 
+                  delta=0, conv_crit = 1e-04, order_type = "align",
+                  sample_prop = 0.75)
+res_2 = k_fit_pch(t(data[,c(1,3)]), ks = 2:3, check_installed = T,
+                  bootstrap = T, bootstrap_N = 200, maxiter = 1000,
+                  bootstrap_type = "m", seed = 2543, 
+                  volume_ratio = "t_ratio", 
+                  delta=0, conv_crit = 1e-04, order_type = "align",
+                  sample_prop = 0.75)
+res_3 = k_fit_pch(t(data[,c(1,4)]), ks = 2:3, check_installed = T,
+                  bootstrap = T, bootstrap_N = 200, maxiter = 1000,
+                  bootstrap_type = "m", seed = 2543, 
+                  volume_ratio = "t_ratio", 
+                  delta=0, conv_crit = 1e-04, order_type = "align",
+                  sample_prop = 0.75)
+res_4 = k_fit_pch(t(data[,c(2,3)]), ks = 2:3, check_installed = T,
+                  bootstrap = T, bootstrap_N = 200, maxiter = 1000,
+                  bootstrap_type = "m", seed = 2543, 
+                  volume_ratio = "t_ratio", 
+                  delta=0, conv_crit = 1e-04, order_type = "align",
+                  sample_prop = 0.75)
+res_5 = k_fit_pch(t(data[,c(2,4)]), ks = 2:3, check_installed = T,
+                  bootstrap = T, bootstrap_N = 200, maxiter = 1000,
+                  bootstrap_type = "m", seed = 2543, 
+                  volume_ratio = "t_ratio", 
+                  delta=0, conv_crit = 1e-04, order_type = "align",
+                  sample_prop = 0.75)
+res_6 = k_fit_pch(t(data[,c(3,4)]), ks = 2:3, check_installed = T,
+                  bootstrap = T, bootstrap_N = 200, maxiter = 1000,
+                  bootstrap_type = "m", seed = 2543, 
+                  volume_ratio = "t_ratio", 
+                  delta=0, conv_crit = 1e-04, order_type = "align",
+                  sample_prop = 0.75)
+
+df = rbind(res_1$summary,res_2$summary,res_3$summary,res_4$summary,res_5$summary,res_6$summary)
+df[,'type'] = c('F1/2','F1/2','F1/3','F1/3','F1/4','F1/4','F2/3','F2/3','F2/4','F2/4','F3/4','F3/4')
+
+total_res = k_fit_pch(t(data[,c(1,4)]), ks = 3, check_installed = T, bootstrap = F, volume_ratio = "t_ratio")
+tern_arc = data.frame(t(res_1$S))
+tern_arc$sample = rownames(t(total_res$S))
+arc = as.data.frame(total_res$XC)
+colnames(arc) = c("Arc1","Arc2","Arc3")
+# write.csv(df,'/github/model_data/Archetype/tratio_df.csv')
+# write.csv(arc,'/github/model_data/Archetype/arc_position.csv')
+# write.csv(tern_arc,'/github/model_data/Archetype/arc_data.csv')
+
+
+
+
+ratio_plot = data.frame('Factor' = c('Factor 1&2', 'Factor 1&3', 'Factor 1&4', 
+                                     'Factor 2&3', 'Factor 2&4', 'Factor 3&4'), 
+                        'tratio' = c(0.4541, 0.5536, 0.6532, 0.4847, 0.6077, 0.5563),
+                        'type' = c(0,0,1,0,0,0))
+
+######## Main figure 1b
+pdf("/github/Figure/Main/Fig1/b_ratio_plots.pdf", width = 16, height = 8)
+ggplot(ratio_plot, aes(x = Factor, y = tratio, group = 1)) +
+  geom_line(linetype = "dashed") +
+  geom_point(aes(color = factor(type)), size = 8) +
+  scale_color_manual(values = c("0" = "black", "1" = "red")) +
+  theme_minimal() + labs(x= '', y = 't-ratio') + 
+  theme(axis.text.x = element_text(size = 15, color = 'black'), axis.text.y = element_text(size = 15, color = 'black'),
+        axis.title.y = element_text(size = 15), legend.position = "none")
+dev.off()
