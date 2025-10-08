@@ -11,7 +11,7 @@ library(reshape2)
 library(DWLS)
 library(presto)
 
-sc = readRDS('/github/singlecell_data/SG/data/SG_processed_data.rds')
+sc = qread('/github/singlecell_data/SG/data/SG_processed_data.qs')
 Cancer = subset(sc, celltype == 'Cancer')
 CMS = data.frame('sample' = colnames(Cancer),'scCMS' = Cancer$scCMS1)
 subtype1 = read.table('/github/singlecell_data/SG/data/Cancer/Cancer_Terminal1.txt',sep = '\t')
