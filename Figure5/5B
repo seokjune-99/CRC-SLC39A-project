@@ -102,4 +102,4 @@ sc@meta.data[,'subcelltype'] = meta$subcelltype
 DimPlot(sc,group.by = 'subcelltype')
 DimPlot(sc,group.by = 'celltype')
 Idents(sc) = sc$subcelltype
-#qsave(sc,'/github/singlecell_data/SG/data/SG_processed_data.qs')
+#saveRDS(sc,'/github/singlecell_data/SG/data/sc_Myeloid.rds')
