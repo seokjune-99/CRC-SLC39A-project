@@ -1,0 +1,450 @@
+library(factoextra)
+library(nnet)       
+library(ggsignif)
+library(ggplot2)
+library(ggpubr)
+library(ggVennDiagram)
+
+expr = read.csv('/github/model_data/TCGA/COAD_tpm.csv', header = T, row.names = 1)
+expr = data.frame(t(expr))
+viper_score = read.csv('/github/model_data/TCGA/L_R_viper_score.csv', header = T, row.names = 1)
+clinic = read.csv('/github/model_data/TCGA/CDA_TCGA_COAD_mRNA_tpm_clinical_info.csv', header = T, row.names = 1)
+rownames(clinic) = gsub('-', '.', rownames(clinic))
+
+moMC_markers = read.csv('/github/singlecell_data/SG/data/Myeloid/moMC_markers.csv',row.names = 1, header = T)
+moDC_markers = read.csv('/github/singlecell_data/SG/data/Myeloid/moDC_markers.csv',row.names = 1, header = T)
+RTMC_markers = read.csv('/github/singlecell_data/SG/data/Myeloid/RTMC_markers.csv',row.names = 1, header = T)
+moMC_only = setdiff(rownames(moMC_markers),rownames(RTMC_markers))
+moDC_only = setdiff(rownames(moDC_markers),rownames(RTMC_markers))
+RTMC_only = setdiff(rownames(RTMC_markers),rownames(moMC_markers))  
+moMC_markers = moMC_markers[moMC_only,]
+moDC_markers = moDC_markers[moDC_only,]
+RTMC_markers = RTMC_markers[RTMC_only,]
+
+
+GOBP_list = readRDS('/github/model_data/Pathway/Geneset/GOBP_geneset.rds')
+geneset = list()
+geneset[[1]] = rownames(moMC_markers)[1:50]
+geneset[[2]] = rownames(RTMC_markers)[1:50]
+geneset[[3]] = rownames(moDC_markers)[1:50]
+geneset[[4]] = c('CD24','SIGLEC10','PTPN6','PTPN11')
+geneset[[5]] = GOBP_list[['regulation of cell-cell adhesion']]
+geneset[[6]] = GOBP_list[['negative regulation of phagocytosis']]
+geneset[[7]] = GOBP_list[['negative regulation of immune response']]
+
+names(geneset) = c('moMC', 'RTMC', 'moDC','KEGG.CD24','regulation.of.cell.cell.adhesion', 'negative.regulation.of.phagocytosis', 'negative.regulation.of.immune.response')
+pathway = gsvaParam(exprData = t(expr),geneSets = geneset)
+pathway = gsva(pathway)
+pathway_res = data.frame(t(pathway))
+total = cbind(clinic,expr[,c('CD24','SIGLEC10')],viper_score[,'CD24.SIGLEC10'],pathway_res)
+colnames(total)[51] = c('CD24-SIGLEC10')
+set.seed(0)
+km.res = kmeans(total[,c('RTMC','moMC')], 4, nstart = 25)
+cluster = km.res$cluster
+cluster[which(cluster == 1)] = 'moMC-RTMC-'
+cluster[which(cluster == 4)] = 'moMC+RTMC-'
+cluster[which(cluster == 2)] = 'moMC-RTMC+'
+cluster[which(cluster == 3)] = 'moMC+RTMC+'
+total[,'cluster'] = cluster
+
+km.res$cluster[which(km.res$cluster == 1)] = 'moMC-RTMC-'
+km.res$cluster[which(km.res$cluster == 4)] = 'moMC+RTMC-'
+km.res$cluster[which(km.res$cluster == 2)] = 'moMC-RTMC+'
+km.res$cluster[which(km.res$cluster == 3)] = 'moMC+RTMC+'
+custom_colors = c("moMC-RTMC-" = "skyblue", "moMC+RTMC-" = "blue", "moMC-RTMC+" = "chocolate", 'moMC+RTMC+' = 'red')
+
+
+######## Main figure 7a
+pdf("/github/Figure/Main/Fig7/a_moMC_RTMC_plot.pdf", width = 6, height = 3)
+fviz_cluster(km.res, total[,c('RTMC','moMC')], frame = FALSE, geom = "point",ellipse.type = "norm", stand = F,
+             main = "TCGA sample (288)") +
+  scale_shape_manual(values = rep(19, length(unique(km.res$cluster)))) +
+  scale_color_manual(values = custom_colors) +
+  scale_fill_manual(values = custom_colors) +
+  theme_classic()
+dev.off()
+
+
+######## Main figure 7b
+pdf("/github/Figure/Main/Fig7/b_CD24_SIGLEC10_score.pdf", width = 10, height = 5)
+ggplot(total, aes(x = factor(cluster, levels = c("moMC-RTMC-", "moMC+RTMC-", "moMC-RTMC+", "moMC+RTMC+")), 
+                  y = `CD24-SIGLEC10`, fill=cluster)) +
+  geom_dotplot(binaxis='y', stackdir='center') + 
+  stat_summary(fun = mean, geom = "crossbar", width = 0.6, fatten = 2, color = "black") + 
+  geom_signif(comparisons = list(c("moMC-RTMC-","moMC+RTMC-"),c("moMC-RTMC-","moMC-RTMC+"),c("moMC-RTMC-","moMC+RTMC+")),
+              map_signif_level = TRUE, step_increase = 0.1) + 
+  scale_fill_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate","moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) + 
+  theme_classic() +  labs(x = "Cluster", y = "CD24-SIGLEC10")
+dev.off()
+
+
+######## Main figure 7c
+pdf("/github/Figure/Main/Fig7/c_RTMC_moMC_phenotype.pdf", width = 12, height = 8)
+ggscatter(total, x = 'moMC', y = 'KEGG.CD24', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+          conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+          color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
+                                                             "moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) +
+  labs(x = "moMC score", y = "CD24 Do not eat me signaling") + 
+  ggscatter(total, x = 'moMC', y = 'negative.regulation.of.immune.response', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
+                                                               "moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) +
+  labs(x = "moMC score", y = "negative regulation of immune response") + 
+  ggscatter(total, x = 'moMC', y = 'negative.regulation.of.phagocytosis', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
+                                                               "moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) +
+  labs(x = "moMC score", y = "negative regulation of phagocytosis") + theme(legend.position = "none") +
+  ggscatter(total, x = 'RTMC', y = 'regulation.of.cell.cell.adhesion', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
+                                                               "moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) +
+  labs(x = "RTMC score", y = "regulation of cell-cell adhesion") + theme(legend.position = "none")
+dev.off()
+
+
+# TCGA moDC
+set.seed(0)
+km.res = kmeans(total[,c('RTMC','moDC')], 4, nstart = 25)
+cluster = km.res$cluster
+cluster[which(cluster == 4)] = 'moDC-RTMC-'
+cluster[which(cluster == 2)] = 'moDC+RTMC-'
+cluster[which(cluster == 3)] = 'moDC-RTMC+'
+cluster[which(cluster == 1)] = 'moDC+RTMC+'
+total[,'cluster'] = cluster
+km.res$cluster[which(km.res$cluster == 4)] = 'moDC-RTMC-'
+km.res$cluster[which(km.res$cluster == 2)] = 'moDC+RTMC-'
+km.res$cluster[which(km.res$cluster == 3)] = 'moDC-RTMC+'
+km.res$cluster[which(km.res$cluster == 1)] = 'moDC+RTMC+'
+custom_colors = c("moDC-RTMC-" = "skyblue", "moDC+RTMC-" = "blue", "moDC-RTMC+" = "chocolate", 'moDC+RTMC+' = 'red')
+
+
+######## Supple figure 7b
+pdf("/github/Figure/Supple/Fig7/b_moDC_RTMC_plot.pdf", width = 6, height = 3)
+fviz_cluster(km.res, total[,c('RTMC','moDC')], frame = FALSE, geom = "point",ellipse.type = "norm", stand = F,
+             main = "TCGA sample (288)") +
+  scale_shape_manual(values = rep(19, length(unique(km.res$cluster)))) +
+  scale_color_manual(values = custom_colors) +
+  scale_fill_manual(values = custom_colors) +
+  theme_classic()
+dev.off()
+
+
+######## Supple figure 7c
+pdf("/github/Figure/Supple/Fig7/c_CD24_SIGLEC10_score.pdf", width = 10, height = 5)
+ggplot(total, aes(x = factor(cluster, levels = c("moDC-RTMC-", "moDC+RTMC-", "moDC-RTMC+", "moDC+RTMC+")), 
+                  y = `CD24-SIGLEC10`, fill=cluster)) +
+  geom_dotplot(binaxis='y', stackdir='center') + 
+  stat_summary(fun = mean, geom = "crossbar", width = 0.6, fatten = 2, color = "black") + 
+  geom_signif(comparisons = list(c("moDC-RTMC-","moDC+RTMC-"),c("moDC-RTMC-","moDC-RTMC+"),c("moDC-RTMC-","moDC+RTMC+")),
+              map_signif_level = TRUE, step_increase = 0.1) + 
+  scale_fill_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate","moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) + 
+  theme_classic() +  labs(x = "Cluster", y = "CD24-SIGLEC10")
+dev.off()
+
+
+######## Supple figure 7d
+pdf("/github/Figure/Supple/Fig7/d_RTMC_moDC_phenotype.pdf", width = 12, height = 8)
+ggscatter(total, x = 'moDC', y = 'KEGG.CD24', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+          conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+          color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
+                                                             "moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) +
+  labs(x = "moDC score", y = "KEGG.CD24") +
+  ggscatter(total, x = 'moDC', y = 'negative.regulation.of.immune.response', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
+                                                               "moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) +
+  labs(x = "moDC score", y = "negative regulation of immune response") + 
+  ggscatter(total, x = 'moDC', y = 'negative.regulation.of.phagocytosis', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
+                                                               "moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) +
+  labs(x = "moDC score", y = "negative regulation of phagocytosis") + theme(legend.position = "none") +
+  ggscatter(total, x = 'RTMC', y = 'regulation.of.cell.cell.adhesion', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
+                                                               "moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) +
+  labs(x = "RTMC score", y = "regulation of cell-cell adhesion") + theme(legend.position = "none")
+dev.off()
+
+
+# CPTAC
+expr = read.csv('/github/model_data/CPTAC/rsem.txt', header = T, row.names = 1, sep = '\t')
+expr = data.frame(t(expr))
+viper_score = read.csv('/github/model_data/CPTAC/CPTAC_L_R_viper_score.csv', header = T, row.names = 1)
+pathway = gsvaParam(exprData = t(expr),geneSets = geneset)
+pathway = gsva(pathway)
+pathway_res = data.frame(t(pathway))
+total = cbind(expr[,c('CD24','SIGLEC10')],viper_score[,'CD24.SIGLEC10'],pathway_res)
+colnames(total)[3] = c('CD24-SIGLEC10')
+
+set.seed(0)
+km.res = kmeans(total[,c('RTMC','moMC')], 4, nstart = 25)
+cluster = km.res$cluster
+cluster[which(cluster == 1)] = 'moMC-RTMC-'
+cluster[which(cluster == 4)] = 'moMC+RTMC-'
+cluster[which(cluster == 2)] = 'moMC-RTMC+'
+cluster[which(cluster == 3)] = 'moMC+RTMC+'
+total[,'cluster'] = cluster
+km.res$cluster[which(km.res$cluster == 1)] = 'moMC-RTMC-'
+km.res$cluster[which(km.res$cluster == 4)] = 'moMC+RTMC-'
+km.res$cluster[which(km.res$cluster == 2)] = 'moMC-RTMC+'
+km.res$cluster[which(km.res$cluster == 3)] = 'moMC+RTMC+'
+custom_colors = c("moMC-RTMC-" = "skyblue", "moMC+RTMC-" = "blue", "moMC-RTMC+" = "chocolate", 'moMC+RTMC+' = 'red')
+
+######## Supple figure 7d
+pdf("/github/Figure/Supple/Fig7/f_CPTAC_moMC_RTMC_plot.pdf", width = 20, height = 6)
+fviz_cluster(km.res, total[,c('RTMC','moMC')], frame = FALSE, geom = "point",ellipse.type = "norm", stand = F,
+             main = "CPTAC sample (106)") +
+  scale_shape_manual(values = rep(19, length(unique(km.res$cluster)))) +
+  scale_color_manual(values = custom_colors) +
+  scale_fill_manual(values = custom_colors) +
+  theme_classic() +
+  ggscatter(total, x = 'moMC', y = 'KEGG.CD24', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
+                                                               "moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) +
+  labs(x = "moMC score", y = "KEGG.CD24") + 
+  ggscatter(total, x = 'moMC', y = 'negative.regulation.of.immune.response', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
+                                                               "moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) +
+  labs(x = "moMC score", y = "negative regulation of immune response") + 
+  ggscatter(total, x = 'moMC', y = 'negative.regulation.of.phagocytosis', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
+                                                               "moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) +
+  labs(x = "moMC score", y = "negative regulation of phagocytosis") + theme(legend.position = "none") +
+  ggscatter(total, x = 'RTMC', y = 'regulation.of.cell.cell.adhesion', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
+                                                               "moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) +
+  labs(x = "RTMC score", y = "regulation of cell-cell adhesion") + theme(legend.position = "none") +
+  plot_layout(nrow = 1)
+dev.off()
+
+
+set.seed(0)
+km.res = kmeans(total[,c('RTMC','moDC')], 4, nstart = 25)
+cluster = km.res$cluster
+cluster[which(cluster == 4)] = 'moDC-RTMC-'
+cluster[which(cluster == 1)] = 'moDC+RTMC-'
+cluster[which(cluster == 3)] = 'moDC-RTMC+'
+cluster[which(cluster == 2)] = 'moDC+RTMC+'
+total[,'cluster'] = cluster
+km.res$cluster[which(km.res$cluster == 4)] = 'moDC-RTMC-'
+km.res$cluster[which(km.res$cluster == 1)] = 'moDC+RTMC-'
+km.res$cluster[which(km.res$cluster == 3)] = 'moDC-RTMC+'
+km.res$cluster[which(km.res$cluster == 2)] = 'moDC+RTMC+'
+custom_colors = c("moDC-RTMC-" = "skyblue", "moDC+RTMC-" = "blue", "moDC-RTMC+" = "chocolate", 'moDC+RTMC+' = 'red')
+
+######## Supple figure 7d
+pdf("/github/Figure/Supple/Fig7/f_CPTAC_moDC_RTMC_plot.pdf", width = 20, height = 6)
+fviz_cluster(km.res, total[,c('RTMC','moDC')], frame = FALSE, geom = "point",ellipse.type = "norm", stand = F,
+             main = "CPTAC sample (106)") +
+  scale_shape_manual(values = rep(19, length(unique(km.res$cluster)))) +
+  scale_color_manual(values = custom_colors) +
+  scale_fill_manual(values = custom_colors) +
+  theme_classic() + 
+  ggscatter(total, x = 'moDC', y = 'KEGG.CD24', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
+                                                               "moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) +
+  labs(x = "moDC score", y = "KEGG.CD24") + 
+  ggscatter(total, x = 'moDC', y = 'negative.regulation.of.immune.response', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
+                                                               "moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) +
+  labs(x = "moDC score", y = "negative regulation of immune response") + 
+  ggscatter(total, x = 'moDC', y = 'negative.regulation.of.phagocytosis', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
+                                                               "moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) +
+  labs(x = "moDC score", y = "negative regulation of phagocytosis") + theme(legend.position = "none") +
+  ggscatter(total, x = 'RTMC', y = 'regulation.of.cell.cell.adhesion', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
+                                                               "moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) +
+  labs(x = "RTMC score", y = "regulation of cell-cell adhesion") + theme(legend.position = "none") +
+  plot_layout(nrow = 1)
+dev.off()
+
+
+
+# ICI
+expr = read.table('/github/model_data/ICI/GSE235919_TPM.txt', header = T, row.names = 1)
+clinic = read_xlsx('/github/model_data/ICI/GSE235919_clinic.xlsx')
+clinic = data.frame(clinic)
+clinic$Sample = gsub("^(\\d+BM)(\\d+)-.*$", "X\\1.\\2", clinic$Sample)
+pathway = gsvaParam(exprData = data.matrix(expr),geneSets = geneset)
+pathway_res = gsva(pathway)
+pathway_res = data.frame(pathway_res)
+
+set.seed(0)
+km.res = kmeans(t(pathway_res)[,c('RTMC','moMC')],4, nstart = 25)
+cluster = km.res$cluster
+cluster[which(cluster == 2)] = 'moMC-RTMC-'
+cluster[which(cluster == 1)] = 'moMC+RTMC-'
+cluster[which(cluster == 3)] = 'moMC+RTMC+'
+cluster[which(cluster == 4)] = 'moMC+RTMC+'
+km.res$cluster[which(km.res$cluster == 2)] = 'moMC-RTMC-'
+km.res$cluster[which(km.res$cluster == 1)] = 'moMC+RTMC-'
+km.res$cluster[which(km.res$cluster == 3)] = 'moMC+RTMC+'
+km.res$cluster[which(km.res$cluster == 4)] = 'moMC+RTMC+'
+custom_colors = c("moMC-RTMC-" = "skyblue", "moMC+RTMC-" = "blue", "moMC-RTMC+" = "chocolate", 'moMC+RTMC+' = 'red')
+
+total_data = data.frame(t(pathway_res))
+total_data[,'Sample'] = rownames(total_data)
+total_data[,'cluster'] = as.character(km.res$cluster)
+total_data[,'SIGLEC10'] = as.numeric(expr['SIGLEC10',])
+total_data = merge(clinic,total_data,by = 'Sample',all.x = T)
+
+fviz_cluster(km.res, t(pathway_res)[,c('RTMC','moMC')], frame = FALSE, geom = "point",ellipse.type = "norm", stand = F,
+             main = "ICI sample (34)") +
+  scale_shape_manual(values = rep(19, length(unique(km.res$cluster)))) +
+  scale_color_manual(values = custom_colors) +
+  scale_fill_manual(values = custom_colors) +
+  theme_classic() + 
+  ggscatter(total_data, x = 'moMC', y = 'negative.regulation.of.immune.response', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
+                                                               "moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) +
+  labs(x = "moMC score", y = "negative regulation of immune response") + 
+  ggscatter(total_data, x = 'moMC', y = 'negative.regulation.of.phagocytosis', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
+                                                               "moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) +
+  labs(x = "moMC score", y = "negative regulation of phagocytosis") + theme(legend.position = "none") +
+  ggscatter(total_data, x = 'RTMC', y = 'regulation.of.cell.cell.adhesion', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
+                                                               "moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) +
+  labs(x = "RTMC score", y = "regulation of cell-cell adhesion") + theme(legend.position = "none") +
+  plot_layout(nrow = 1)
+
+
+
+plot_df = total_data
+plot_df[,'type'] = 'R'
+plot_df[which(plot_df$Recist == 'Stable disease'),'type'] = 'NR'
+
+######## Main figure 7d
+pdf("/github/Figure/Main/Fig7/d_ICI_response.pdf", width = 6, height = 6)
+ggplot(plot_df,aes(x = cluster,fill = type)) + 
+  geom_bar(position = "fill") + scale_fill_manual(values = c("NR" = "#E74C3C", "R" = "#3498DB")) + theme_bw() +
+  labs(x = "Cluster", y = "Proportion", fill = "Response Type", title = "Response Proportion by Cluster") 
+dev.off()
+
+table(plot_df$type,plot_df$cluster)
+x = matrix(c(9, 9, 1, 9), nrow = 2, byrow = TRUE)
+colnames(x) = c("NR", "R")
+rownames(x) = c("moMC+RTMC+", "moMC-RTMC-")
+fisher.test(x)
+
+
+set.seed(0)
+km.res = kmeans(t(pathway_res)[,c('RTMC','moDC')],4, nstart = 25)
+cluster = km.res$cluster
+cluster[which(cluster == 2)] = 'moDC-RTMC-'
+cluster[which(cluster == 1)] = 'moDC+RTMC-'
+cluster[which(cluster == 3)] = 'moDC+RTMC+'
+cluster[which(cluster == 4)] = 'moDC+RTMC+'
+km.res$cluster[which(km.res$cluster == 2)] = 'moDC-RTMC-'
+km.res$cluster[which(km.res$cluster == 1)] = 'moDC+RTMC-'
+km.res$cluster[which(km.res$cluster == 3)] = 'moDC+RTMC+'
+km.res$cluster[which(km.res$cluster == 4)] = 'moDC+RTMC+'
+custom_colors = c("moDC-RTMC-" = "skyblue", "moDC+RTMC-" = "blue", "moDC-RTMC+" = "chocolate", 'moDC+RTMC+' = 'red')
+total_data = data.frame(t(pathway_res))
+total_data[,'Sample'] = rownames(total_data)
+total_data[,'cluster'] = as.character(km.res$cluster)
+total_data[,'SIGLEC10'] = as.numeric(expr['SIGLEC10',])
+total_data = merge(clinic,total_data,by = 'Sample',all.x = T)
+
+fviz_cluster(km.res, t(pathway_res)[,c('RTMC','moDC')], frame = FALSE, geom = "point",ellipse.type = "norm", stand = F,
+             main = "ICI sample (34)") +
+  scale_shape_manual(values = rep(19, length(unique(km.res$cluster)))) +
+  scale_color_manual(values = custom_colors) +
+  scale_fill_manual(values = custom_colors) +
+  theme_classic() + 
+  ggscatter(total_data, x = 'moDC', y = 'negative.regulation.of.immune.response', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
+                                                               "moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) +
+  labs(x = "moDC score", y = "negative regulation of immune response") + 
+  ggscatter(total_data, x = 'moDC', y = 'negative.regulation.of.phagocytosis', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
+                                                               "moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) +
+  labs(x = "moDC score", y = "negative regulation of phagocytosis") + theme(legend.position = "none") +
+  ggscatter(total_data, x = 'RTMC', y = 'regulation.of.cell.cell.adhesion', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
+            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
+            color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
+                                                               "moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) +
+  labs(x = "RTMC score", y = "regulation of cell-cell adhesion") + theme(legend.position = "none") +
+  plot_layout(nrow = 1)
+
+
+
+
+plot_df = total_data
+plot_df[,'type'] = 'R'
+plot_df[which(plot_df$Recist == 'Stable disease'),'type'] = 'NR'
+
+######## Supple figure 7e
+pdf("/github/Figure/Supple/Fig7/e_ICI_moDC_response.pdf", width = 6, height = 6)
+ggplot(plot_df,aes(x = cluster,fill = type)) + 
+  geom_bar(position = "fill") + scale_fill_manual(values = c("NR" = "#E74C3C", "R" = "#3498DB")) + theme_bw() +
+  labs(x = "Cluster", y = "Proportion", fill = "Response Type", title = "Response Proportion by Cluster") 
+dev.off()
+
+table(plot_df$type,plot_df$cluster)
+x = matrix(c(8, 8, 1, 10), nrow = 2, byrow = TRUE)
+colnames(x) = c("NR", "R")
+rownames(x) = c("moDC+RTMC+", "moDC-RTMC-")
+fisher.test(x)
+
+
+
+moMC_markers = read.csv('/github/singlecell_data/SG/data/Myeloid/moMC_markers.csv',row.names = 1, header = T)
+moDC_markers = read.csv('/github/singlecell_data/SG/data/Myeloid/moDC_markers.csv',row.names = 1, header = T)
+RTMC_markers = read.csv('/github/singlecell_data/SG/data/Myeloid/RTMC_markers.csv',row.names = 1, header = T)
+moMC_only = setdiff(rownames(moMC_markers),rownames(RTMC_markers))
+moDC_only = setdiff(rownames(moDC_markers),rownames(RTMC_markers))
+RTMC_only = setdiff(rownames(RTMC_markers),rownames(moMC_markers))  
+moMC_markers = moMC_markers[moMC_only,]
+moDC_markers = moDC_markers[moDC_only,]
+RTMC_markers = RTMC_markers[RTMC_only,]
+marker_list = c()
+marker_list[['moMC marker genes']] = rownames(moMC_markers)[1:50]
+marker_list[['moDC marker genes']] = rownames(moDC_markers)[1:50]
+marker_list[['RTMC marker genes']] = rownames(RTMC_markers)[1:50]
+
+GOBP_list = readRDS('/github/model_data/Pathway/Geneset/GOBP_geneset.rds')
+Phago = GOBP_list[['negative regulation of phagocytosis']]
+Immune = GOBP_list[['negative regulation of immune response']]
+Adhesion = GOBP_list[['regulation of cell-cell adhesion']]
+CD24 = c('CD24','SIGLEC10','PTPN6','PTPN11')
+
+path_list = c()
+path_list[['CD24 Do not eat me signaling']] = CD24
+path_list[['negative regulation of phagocytosis']] = Phago
+path_list[['negative regulation of immune response']] = Immune
+
+Marker.Path_list = c()
+Marker.Path_list[['moMC marker genes']] = rownames(moMC_markers)[1:50]
+Marker.Path_list[['moDC marker genes']] = rownames(moDC_markers)[1:50]
+Marker.Path_list[['CD24 Do not eat me signaling']] = CD24
+Marker.Path_list[['negative regulation of phagocytosis']] = Phago
+Marker.Path_list[['negative regulation of immune response']] = Immune
+
+Adhesion_list = c()
+Adhesion_list[['RTMC marker genes']] = rownames(RTMC_markers)[1:50]
+Adhesion_list[['regulation of cell-cell adhesion']] = Adhesion
+
+######## Supple figure 7a
+pdf("/github/Figure/Supple/Fig7/a_Marker_target_Diagram.pdf", width = 12, height = 8)
+ggVennDiagram(marker_list) + scale_fill_gradient(low = "#F4FAFE", high = "#4981BF") + coord_flip() +
+  ggVennDiagram(path_list) + scale_fill_gradient(low = "#F4FAFE", high = "#4981BF") + coord_flip() + 
+  ggVennDiagram(Marker.Path_list) + scale_fill_gradient(low = "#F4FAFE", high = "#4981BF") + coord_flip() + 
+  ggVennDiagram(Adhesion_list) + scale_fill_gradient(low = "#F4FAFE", high = "#4981BF") + coord_flip() 
+dev.off()
