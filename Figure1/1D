@@ -15,7 +15,7 @@ factor_score[,'CMS'] = CMS[rownames(factor_score),'prediction']
 factor_score[is.na(factor_score[,'CMS']),'CMS'] = 'NA'
 
 ######## Main figure 1e left
-pdf("/github/Figure/Main/Fig1/e_Factor_CMS_mapping.pdf", width = 24, height = 6)
+pdf("/github/Figure/Main/Fig1/d_Factor_CMS_mapping.pdf", width = 24, height = 6)
 ggplot(factor_score,aes(x=Factor1,y=Factor4,color = CMS)) + geom_point(cex=7) + 
   geom_segment(data= data.frame(t(arcpos)), aes(x=unlist(arcpos[1,]), xend=unlist(arcpos[1,c(2,3,1)]) , 
                                                 y=unlist(arcpos[2,]),yend=unlist(arcpos[2,c(2,3,1)])),col="lightblue",cex=2 ) + 
@@ -136,19 +136,19 @@ A3_res_df = A3_res_df[A3_feature_list,rownames(A3_arc_data)]
 plaetteLength = 70 
 myColor = colorRampPalette(c("blue2", "white", "red2"))(plaetteLength)
 myBreaks = c(seq(min(A1_res_df), 0, length.out=ceiling(plaetteLength/2)+1), seq(max(A1_res_df)/plaetteLength, 3, length.out=floor(plaetteLength/2)))
-png('/github/Figure/Main/Fig1/e_A1_pathway.png', width = 1600, height = 800)
+png('/github/Figure/Main/Fig1/d_A1_pathway.png', width = 1600, height = 800)
 pheatmap(A1_res_df,cluster_rows = T, cluster_cols = F,show_rownames=F,show_colnames=F,
          color = myColor, breaks = myBreaks)
 dev.off()
 
 myBreaks = c(seq(min(A2_res_df), 0, length.out=ceiling(plaetteLength/2)+1), seq(max(A2_res_df)/plaetteLength, 3, length.out=floor(plaetteLength/2)))
-png('/github/Figure/Main/Fig1/e_A2_pathway.png', width = 1600, height = 800)
+png('/github/Figure/Main/Fig1/d_A2_pathway.png', width = 1600, height = 800)
 pheatmap(A2_res_df,cluster_rows = T, cluster_cols = F,show_rownames=F,show_colnames=F,
          color = myColor, breaks = myBreaks)
 dev.off()
 
 myBreaks = c(seq(min(A3_res_df), 0, length.out=ceiling(plaetteLength/2)+1), seq(max(A3_res_df)/plaetteLength, 3, length.out=floor(plaetteLength/2)))
-png('/github/Figure/Main/Fig1/e_A3_pathway.png', width = 1600, height = 800)
+png('/github/Figure/Main/Fig1/d_A3_pathway.png', width = 1600, height = 800)
 pheatmap(A3_res_df,cluster_rows = T, cluster_cols = F,show_rownames=F,show_colnames=F,
          color = myColor, breaks = myBreaks)
 dev.off()
@@ -176,7 +176,7 @@ rownames(df) = NULL
 df$celltype = c('Bcells','CD4 Tcells','CD8 Tcells','Dendritic cells', 'Macrophages','Mast cells','Monocytes', 'Neutrophils', 'NK cells', 'Plasma cells', 'Th1 cells', 'Th2 cells', 'Tregs')
 df$celltype = factor(df$celltype, levels = c('Dendritic cells', 'Mast cells', 'Macrophages', 'Monocytes', 'Bcells', 'Plasma cells', 'Neutrophils', 'NK cells', 'Th1 cells', 'Th2 cells', 'CD8 Tcells', 'CD4 Tcells', 'Tregs'))
 
-pdf("/github/Figure/Main/Fig1/e_TME.pdf", width = 32, height = 8)
+pdf("/github/Figure/Main/Fig1/d_TME.pdf", width = 32, height = 8)
 ggplot(df, aes(x = celltype, y = A1)) +
   geom_segment(aes(x = celltype, xend = celltype, y = 0, yend = A1), colour = "black",lwd =0.5) +
   geom_point(size = 10, aes(colour = celltype)) + 
