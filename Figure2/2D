@@ -122,29 +122,3 @@ CD24_enh = plotBrowserTrack(
 pdf("/github/Figure/Main/Fig2/d_scATAC.pdf", width = 16, height = 8)
 grid::grid.draw(CD24_enh)
 dev.off()
-
-
-
-
-SLC39A1 = plotBrowserTrack(ArchRProj = proj, groupBy = "celltype", plotSummary = c('BulkTrack',"FeatureTrack", "GeneTrack"), scCellsMax = 20000, 
-                           region = GRanges("chr1", IRanges(start = 153959099-3000, end = 153968184+3000)))
-SLC39A2 = plotBrowserTrack(ArchRProj = proj, groupBy = "celltype", plotSummary = c('BulkTrack',"FeatureTrack", "GeneTrack"), scCellsMax = 20000, 
-                           region = GRanges("chr14", IRanges(start = 20999255-3000, end = 21001871+3000)))
-SLC39A3 = plotBrowserTrack(ArchRProj = proj, groupBy = "celltype", plotSummary = c('BulkTrack',"FeatureTrack", "GeneTrack"), scCellsMax = 20000, 
-                           region = GRanges("chr19", IRanges(start = 2717769-3000, end = 2740152+3000)))
-SLC39A4 = plotBrowserTrack(ArchRProj = proj, groupBy = "celltype", plotSummary = c('BulkTrack',"FeatureTrack", "GeneTrack"), scCellsMax = 20000, 
-                           region = GRanges("chr8", IRanges(start = 144409742-3000, end = 144416895+3000)))
-SLC39A5 = plotBrowserTrack(ArchRProj = proj, groupBy = "celltype", plotSummary = c('BulkTrack',"FeatureTrack", "GeneTrack"), scCellsMax = 20000, 
-                           region = GRanges("chr12", IRanges(start = 56230049-3000, end = 56237846+3000)))
-SLC39A6 = plotBrowserTrack(ArchRProj = proj, groupBy = "celltype", plotSummary = c('BulkTrack',"FeatureTrack", "GeneTrack"), scCellsMax = 20000, 
-                           region = GRanges("chr18", IRanges(start = 36108532-3000, end = 36129385+3000)))
-SLC39A8 = plotBrowserTrack(ArchRProj = proj, groupBy = "celltype", plotSummary = c('BulkTrack',"FeatureTrack", "GeneTrack"), scCellsMax = 20000, 
-                           region = GRanges("chr4", IRanges(start = 102251041-3000, end = 102431258+3000)))
-SLC39A10 = plotBrowserTrack(ArchRProj = proj, groupBy = "celltype", plotSummary = c('BulkTrack',"FeatureTrack", "GeneTrack"), scCellsMax = 20000, 
-                            region = GRanges("chr2", IRanges(start = 195575977-3000, end = 195737702+3000)))
-SLC39A14 = plotBrowserTrack(ArchRProj = proj, groupBy = "celltype", plotSummary = c('BulkTrack',"FeatureTrack", "GeneTrack"), scCellsMax = 20000, 
-                            region = GRanges("chr8", IRanges(start = 22367249-3000, end = 22434129+3000)))
-CDX2 = plotBrowserTrack(ArchRProj = proj, groupBy = "celltype", plotSummary = c('BulkTrack',"FeatureTrack", "GeneTrack"), scCellsMax = 20000, 
-                        region = GRanges("chr13", IRanges(start = 27962137-3000, end = 27971139+3000)))
-CD24 = plotBrowserTrack(ArchRProj = proj, groupBy = "celltype", plotSummary = c('BulkTrack',"FeatureTrack", "GeneTrack"), scCellsMax = 20000, 
-                        region = GRanges("chr6", IRanges(start = 106969831-3000, end = 106975627+3000)))
