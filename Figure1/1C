@@ -15,7 +15,7 @@ factor_score[,'CMS'] = CMS[rownames(factor_score),'prediction']
 factor_score[is.na(factor_score[,'CMS']),'CMS'] = 'NA'
 
 ######## Main figure 1d (left)
-pdf("/github/Figure/Main/Fig1/d_ggplot_overview.pdf", width = 8, height = 6)
+pdf("/github/Figure/Main/Fig1/c_ggplot_overview.pdf", width = 8, height = 6)
 ggplot(factor_score[-which(factor_score$CMS == 'NA'),],aes(x=Factor1,y=Factor4,color = CMS)) + geom_point(cex=7) + 
   geom_segment(data= data.frame(t(arcpos)), aes(x=unlist(arcpos[1,]), xend=unlist(arcpos[1,c(2,3,1)]) , 
                                                 y=unlist(arcpos[2,]),yend=unlist(arcpos[2,c(2,3,1)])),col="lightblue",cex=2 ) + 
@@ -43,7 +43,7 @@ denshigh.cols$ImmuneScore.col = rev(colfunc.bg(21))[round( (denshigh.cols$Immune
 colors_clin1 = c(CMS1='Forestgreen',CMS2='red2',CMS3 = 'yellow',CMS4 = 'dodger blue')
 denshighhypo[3,] = denshigh.cols$ImmuneScore.col
 
-pdf("/github/Figure/Main/Fig1/d_Ternaryplot_overview.pdf", width = 16, height = 8)
+pdf("/github/Figure/Main/Fig1/c_Ternaryplot_overview.pdf", width = 16, height = 8)
 TernaryPlot(point = "up", 
             lab.cex = 0.8, grid.minor.lines = 0,
             grid.lines = 5,
@@ -67,14 +67,14 @@ points(xy[1, ] + c(-sqrt(0.1**2/2),0,sqrt(0.1**2/2)), xy[2, ]+c(-sqrt(0.1**2/2),
 text(xy[1, ] + c(-sqrt(0.1**2/2),0,sqrt(0.1**2/2)), xy[2, ]+c(-sqrt(0.1**2/2),0.1,-sqrt(0.1**2/2)), names(data_points), cex = 0.8, font = 2)
 dev.off()
 
-pdf("/github/Figure/Main/Fig1/d_Ternaryplot_overview_legend1.pdf", width = 16, height = 8)
+pdf("/github/Figure/Main/Fig1/c_Ternaryplot_overview_legend1.pdf", width = 16, height = 8)
 l1 = get_legend(ggplot(denshigh.cols, aes(x = ImmuneScore, y = 1, fill = ImmuneScore)) + 
                   geom_tile(aes(fill = ImmuneScore), colour = "grey") + 
                   scale_fill_gradient2(low = "royalblue", mid = "white", high = "red", midpoint = mean(denshigh.cols$ImmuneScore[which(denshigh.cols$ImmuneScore.col == "#FFFFFF")]), name = "ImmuneScore score"))
 plot_grid(l1)
 dev.off()
 
-pdf("/github/Figure/Main/Fig1/d_Ternaryplot_overview_legend2.pdf", width = 16, height = 8)
+pdf("/github/Figure/Main/Fig1/c_Ternaryplot_overview_legend2.pdf", width = 16, height = 8)
 l2 = get_legend(ggplot(arc[-which(is.na(arc$CMS)),], aes(x = Arc1, y = Arc2, fill = CMS)) + 
                   geom_tile(aes(fill = CMS), colour = "grey") +
                   scale_fill_manual(values = c("Forestgreen", "red2", "yellow", "dodger blue")))
