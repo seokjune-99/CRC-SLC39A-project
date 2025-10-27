@@ -1,64 +1,11 @@
-expr = read.csv('/github/model_data/TCGA/COAD_tpm.csv', header = T, row.names = 1)
-arc = read.csv('/github/model_data/Archetype/arc_data.csv', header = T, row.names = 1)
-pro = read.csv('/github/model_data/Viper/coad_protein_activity.csv',header = T, row.names = 1)
+getwd()
+rm(list = ls())
+gc()
+
+expr = read.csv('/media/ssd2/seokjune/github/model_data/TCGA/COAD_tpm.csv', header = T, row.names = 1)
+arc = read.csv('/media/ssd2/seokjune/github/model_data/Archetype/arc_data.csv', header = T, row.names = 1)
+pro = read.csv('/media/ssd2/seokjune/github/model_data/Viper/coad_protein_activity.csv',header = T, row.names = 1)
 pro = data.frame(t(pro))
-
-
-df = data.frame(cbind(arc[,'X1'], t(expr)[rownames(arc),c(paste0('SLC39A',1:14),paste0('SLC30A',1:10))]))
-colnames(df)[1] = 'A1'
-genes = c(paste0('SLC39A',1:14),paste0('SLC30A',1:10))
-res = lapply(genes, function(gene) {
-  test = cor.test(df$A1, df[[gene]], method = "pearson")
-  data.frame(
-    Gene = gene,
-    Cor = test$estimate,
-    Pval = test$p.value
-  )
-}) %>% bind_rows()
-res = res %>% mutate(FDR = p.adjust(Pval, method = "fdr"),Significant = ifelse(FDR < 0.05, TRUE, FALSE))
-res_SLC30 = res[grep('SLC30',res$Gene),]
-res_SLC39 = res[grep('SLC39',res$Gene),]
-fdr_range = range(-log10(res_SLC39$FDR), -log10(res_SLC30$FDR), na.rm = TRUE)
-cor_range = range(res_SLC39$Cor, na.rm = TRUE)
-
-
-pdf("Fig/Supple/Model/SLC30.pdf", width = 10, height = 5)
-
-######## Supple figure 2a
-pdf("/github/Figure/Supple/Fig2/a_SLC30.pdf", width = 10, height = 5)
-ggplot(res_SLC39, aes(y = Cor, x = Gene)) +
-  geom_segment(aes(y = 0, yend = Cor, x = Gene, xend = Gene), color = "gray60") +
-  geom_point(aes(fill = ifelse(Cor > 0, "pos", "neg"),
-                 size = -log10(FDR)),
-             shape = 21,
-             color = ifelse(res_SLC39$Significant, "black", "transparent"),
-             stroke = 1.2) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  scale_fill_manual(values = c("pos" = "red", "neg" = "blue")) +
-  scale_y_continuous(limits = cor_range) +  # SLC39 범위 고정
-  scale_x_discrete(limits = genes[1:14]) +
-  scale_size_continuous(limits = fdr_range, range = c(2, 8)) +
-  theme_classic() + theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(x = "Gene", y = "Correlation Coefficient",
-       title = "Correlation of A1 with SLC39A Family") + 
-  ggplot(res_SLC30, aes(y = Cor, x = Gene)) +
-  geom_segment(aes(y = 0, yend = Cor, x = Gene, xend = Gene), color = "gray60") +
-  geom_point(aes(fill = ifelse(Cor > 0, "pos", "neg"),
-                 size = -log10(FDR)),
-             shape = 21,
-             color = ifelse(res_SLC30$Significant, "black", "transparent"),
-             stroke = 1.2) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  scale_fill_manual(values = c("pos" = "red", "neg" = "blue")) +
-  scale_y_continuous(limits = cor_range) +  # SLC39 범위 강제 적용
-  scale_x_discrete(limits = genes[15:24]) +
-  scale_size_continuous(limits = fdr_range, range = c(2, 8)) +
-  theme_classic() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(x = "Gene", y = "Correlation Coefficient",
-       title = "Correlation of A1 with SLC30A Family",
-       size = "-log10(FDR)")
-dev.off()
-
 
 
 geneset = list()
@@ -94,7 +41,7 @@ denshighhypo[3,] = denshigh.cols$Zinc.col
 
 
 ######## Main figure 2a
-pdf("/github/Figure/Main/Fig2/a_Ternaryplot_Zinc.pdf", width = 16, height = 8)
+pdf("/media/ssd2/seokjune/github/Figure/Main/Fig2/a_Ternaryplot_Zinc.pdf", width = 16, height = 8)
 TernaryPlot(point = "up", 
             lab.cex = 0.8, grid.minor.lines = 0,
             grid.lines = 5,
@@ -113,7 +60,7 @@ points(xy[1, ] + c(-sqrt(0.1**2/2),0,sqrt(0.1**2/2)), xy[2, ]+c(-sqrt(0.1**2/2),
        pch = 19, cex = 5, col = alpha(c("red2","dodger blue", "Forestgreen"),0.7))
 text(xy[1, ] + c(-sqrt(0.1**2/2),0,sqrt(0.1**2/2)), xy[2, ]+c(-sqrt(0.1**2/2),0.1,-sqrt(0.1**2/2)), names(data_points), cex = 0.8, font = 2)
 dev.off()
-pdf("/github/Figure/Main/Fig2/a_Ternaryplot_Zinc_legend.pdf", width = 16, height = 8)
+pdf("/media/ssd2/seokjune/github/Figure/Main/Fig2/a_Ternaryplot_Zinc_legend.pdf", width = 16, height = 8)
 l1 = get_legend(ggplot(denshigh.cols, aes(x = Zinc, y = 1, fill = Zinc)) + geom_tile(aes(fill = Zinc), colour = "grey") + 
                   scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkred", midpoint = mean(denshigh.cols$Zinc[which(denshigh.cols$Zinc.col == "#FFFFFF")]), name = "Zinc score"))
 plot_grid(l1)
@@ -129,7 +76,7 @@ for(i in 1:ncol(denshighhypo)){
 colfunc.bg = colorRampPalette(c("darkred", "white", "darkgreen")) #red - blue/green
 denshigh.cols$SLC39.col = rev(colfunc.bg(21))[round( (denshigh.cols$SLC39-min(denshigh.cols$SLC39))/(max(denshigh.cols$SLC39)-min(denshigh.cols$SLC39))*20 )+1]
 denshighhypo[3,] = denshigh.cols$SLC39.col
-pdf("/github/Figure/Supple/Fig2/b_Ternaryplot_SLC39.pdf", width = 16, height = 8)
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig2/a_Ternaryplot_SLC39.pdf", width = 16, height = 8)
 TernaryPlot(point = "up", 
             lab.cex = 0.8, grid.minor.lines = 0,
             grid.lines = 5,
@@ -148,7 +95,7 @@ points(xy[1, ] + c(-sqrt(0.1**2/2),0,sqrt(0.1**2/2)), xy[2, ]+c(-sqrt(0.1**2/2),
        pch = 19, cex = 5, col = alpha(c("red2","dodger blue", "Forestgreen"),0.7))
 text(xy[1, ] + c(-sqrt(0.1**2/2),0,sqrt(0.1**2/2)), xy[2, ]+c(-sqrt(0.1**2/2),0.1,-sqrt(0.1**2/2)), names(data_points), cex = 0.8, font = 2)
 dev.off()
-pdf("/github/Figure/Supple/Fig2/b_Ternaryplot_SLC39_legend.pdf", width = 16, height = 8)
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig2/a_Ternaryplot_SLC39_legend.pdf", width = 16, height = 8)
 l1 = get_legend(ggplot(denshigh.cols, aes(x = SLC39, y = 1, fill = SLC39)) + geom_tile(aes(fill = SLC39), colour = "grey") + 
                   scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkred", midpoint = mean(denshigh.cols$SLC39[which(denshigh.cols$SLC39.col == "#FFFFFF")]), name = "SLC39 score"))
 plot_grid(l1)
@@ -163,7 +110,7 @@ for(i in 1:ncol(denshighhypo)){
 colfunc.bg = colorRampPalette(c("darkred", "white", "darkgreen")) #red - blue/green
 denshigh.cols$CDX2.col = rev(colfunc.bg(21))[round( (denshigh.cols$CDX2-min(denshigh.cols$CDX2))/(max(denshigh.cols$CDX2)-min(denshigh.cols$CDX2))*20 )+1]
 denshighhypo[3,] = denshigh.cols$CDX2.col
-pdf("/github/Figure/Supple/Fig2/b_Ternaryplot_CDX2.pdf", width = 16, height = 8)
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig2/a_Ternaryplot_CDX2.pdf", width = 16, height = 8)
 TernaryPlot(point = "up", 
             lab.cex = 0.8, grid.minor.lines = 0,
             grid.lines = 5,
@@ -182,7 +129,7 @@ points(xy[1, ] + c(-sqrt(0.1**2/2),0,sqrt(0.1**2/2)), xy[2, ]+c(-sqrt(0.1**2/2),
        pch = 19, cex = 5, col = alpha(c("red2","dodger blue", "Forestgreen"),0.7))
 text(xy[1, ] + c(-sqrt(0.1**2/2),0,sqrt(0.1**2/2)), xy[2, ]+c(-sqrt(0.1**2/2),0.1,-sqrt(0.1**2/2)), names(data_points), cex = 0.8, font = 2)
 dev.off()
-pdf("/github/Figure/Supple/Fig2/b_Ternaryplot_CDX2_legend.pdf", width = 16, height = 8)
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig2/a_Ternaryplot_CDX2_legend.pdf", width = 16, height = 8)
 l1 = get_legend(ggplot(denshigh.cols, aes(x = CDX2, y = 1, fill = CDX2)) + geom_tile(aes(fill = CDX2), colour = "grey") + 
                   scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkred", midpoint = mean(denshigh.cols$CDX2[which(denshigh.cols$CDX2.col == "#FFFFFF")]), name = "CDX2 score"))
 plot_grid(l1)
@@ -197,7 +144,7 @@ for(i in 1:ncol(denshighhypo)){
 colfunc.bg = colorRampPalette(c("darkred", "white", "darkgreen")) #red - blue/green
 denshigh.cols$CDX2PA.col = rev(colfunc.bg(21))[round( (denshigh.cols$CDX2PA-min(denshigh.cols$CDX2PA))/(max(denshigh.cols$CDX2PA)-min(denshigh.cols$CDX2PA))*20 )+1]
 denshighhypo[3,] = denshigh.cols$CDX2PA.col
-pdf("/github/Figure/Supple/Fig2/b_Ternaryplot_CDX2PA.pdf", width = 16, height = 8)
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig2/a_Ternaryplot_CDX2PA.pdf", width = 16, height = 8)
 TernaryPlot(point = "up", 
             lab.cex = 0.8, grid.minor.lines = 0,
             grid.lines = 5,
@@ -216,7 +163,7 @@ points(xy[1, ] + c(-sqrt(0.1**2/2),0,sqrt(0.1**2/2)), xy[2, ]+c(-sqrt(0.1**2/2),
        pch = 19, cex = 5, col = alpha(c("red2","dodger blue", "Forestgreen"),0.7))
 text(xy[1, ] + c(-sqrt(0.1**2/2),0,sqrt(0.1**2/2)), xy[2, ]+c(-sqrt(0.1**2/2),0.1,-sqrt(0.1**2/2)), names(data_points), cex = 0.8, font = 2)
 dev.off()
-pdf("/github/Figure/Supple/Fig2/b_Ternaryplot_CDX2PA_legend.pdf", width = 16, height = 8)
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig2/a_Ternaryplot_CDX2PA_legend.pdf", width = 16, height = 8)
 l1 = get_legend(ggplot(denshigh.cols, aes(x = CDX2PA, y = 1, fill = CDX2PA)) + geom_tile(aes(fill = CDX2PA), colour = "grey") + 
                   scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkred", midpoint = mean(denshigh.cols$CDX2PA[which(denshigh.cols$CDX2PA.col == "#FFFFFF")]), name = "CDX2PA score"))
 plot_grid(l1)
@@ -231,7 +178,7 @@ for(i in 1:ncol(denshighhypo)){
 colfunc.bg = colorRampPalette(c("darkred", "white", "darkgreen")) #red - blue/green
 denshigh.cols$CD24.col = rev(colfunc.bg(21))[round( (denshigh.cols$CD24-min(denshigh.cols$CD24))/(max(denshigh.cols$CD24)-min(denshigh.cols$CD24))*20 )+1]
 denshighhypo[3,] = denshigh.cols$CD24.col
-pdf("/github/Figure/Supple/Fig2/b_Ternaryplot_CD24.pdf", width = 16, height = 8)
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig2/a_Ternaryplot_CD24.pdf", width = 16, height = 8)
 TernaryPlot(point = "up", 
             lab.cex = 0.8, grid.minor.lines = 0,
             grid.lines = 5,
@@ -250,7 +197,7 @@ points(xy[1, ] + c(-sqrt(0.1**2/2),0,sqrt(0.1**2/2)), xy[2, ]+c(-sqrt(0.1**2/2),
        pch = 19, cex = 5, col = alpha(c("red2","dodger blue", "Forestgreen"),0.7))
 text(xy[1, ] + c(-sqrt(0.1**2/2),0,sqrt(0.1**2/2)), xy[2, ]+c(-sqrt(0.1**2/2),0.1,-sqrt(0.1**2/2)), names(data_points), cex = 0.8, font = 2)
 dev.off()
-pdf("/github/Figure/Supple/Fig2/b_Ternaryplot_CD24_legend.pdf", width = 16, height = 8)
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig2/a_Ternaryplot_CD24_legend.pdf", width = 16, height = 8)
 l1 = get_legend(ggplot(denshigh.cols, aes(x = CD24, y = 1, fill = CD24)) + geom_tile(aes(fill = CD24), colour = "grey") + 
                   scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkred", midpoint = mean(denshigh.cols$CD24[which(denshigh.cols$CD24.col == "#FFFFFF")]), name = "CD24 score"))
 plot_grid(l1)
@@ -259,7 +206,7 @@ dev.off()
 
 
 
-expr = read.csv('/github/model_data/TCGA/COAD_expr.csv', header = T, row.names = 1)
+expr = read.csv('/media/ssd2/seokjune/github/model_data/TCGA/COAD_expr.csv', header = T, row.names = 1)
 geneset = list()
 geneset[[1]] = c('SLC39A14', 'SLC39A4', 'SLC7A6', 'SLC39A1', 'SLC39A6', 'SLC39A2', 'SLC39A5', 'SLC11A2', 'SLC39A3', 'SLC39A10', 'SLC39A8')
 names(geneset) = 'Zinc'
@@ -282,7 +229,7 @@ for(i in 1:length(gene)){
 }
 TCGA_expr = data.frame(pval,coef,gene)
 TCGA_expr[,'type'] = 'TCGA-expr'
-PA = read.csv('/github/model_data/Viper/coad_protein_activity.csv', header = T, row.names = 1)
+PA = read.csv('/media/ssd2/seokjune/github/model_data/Viper/coad_protein_activity.csv', header = T, row.names = 1)
 PA = data.frame(t(PA))
 PA = cbind(PA,pathway_res$Zinc)
 colnames(PA)[5172] = 'Zinc'
@@ -298,7 +245,7 @@ colnames(TCGA_PA)[3] = 'gene'
 TCGA_PA[,'type'] = 'TCGA-PA'
 
 
-CPTAC_expr = read.csv('/github/model_data/CPTAC/rsem.txt', header = T,sep = '\t',row.names = 1)
+CPTAC_expr = read.csv('/media/ssd2/seokjune/github/model_data/CPTAC/rsem.txt', header = T,sep = '\t',row.names = 1)
 CPTAC_pathway = gsvaParam(exprData = data.matrix(CPTAC_expr),geneSets = geneset)
 CPTAC_pathway = gsva(CPTAC_pathway)
 CPTAC_pathway_res = data.frame(t(CPTAC_pathway))
@@ -317,7 +264,7 @@ colnames(CPTAC_expr)[3] = 'gene'
 CPTAC_expr[,'type'] = 'CPTAC-expr'
 
 
-CPTAC_pro = read.csv('/github/model_data/CPTAC/proteom.txt', header = T, row.names = 1, sep = '\t')
+CPTAC_pro = read.csv('/media/ssd2/seokjune/github/model_data/CPTAC/proteom.txt', header = T, row.names = 1, sep = '\t')
 CPTAC_pro = data.frame(t(CPTAC_pro))
 sample = intersect(rownames(CPTAC_pro),rownames(CPTAC_pathway_res))
 CPTAC_pro = cbind(CPTAC_pro[sample,],CPTAC_pathway_res[sample,'Zinc'])
@@ -339,7 +286,7 @@ total_res_df$gene = factor(total_res_df$gene, levels = rev(gene))
 total_res_df$type = factor(total_res_df$type, levels = c("TCGA-expr", "TCGA-PA", 'CPTAC-expr', 'CPTAC-pro'))
 
 ######## Main figure 2a
-pdf("/github/Figure/Main/Fig2/a_corplot.pdf", width = 8, height = 12)
+pdf("/media/ssd2/seokjune/github/Figure/Main/Fig2/a_corplot.pdf", width = 8, height = 12)
 ggplot(total_res_df, aes(x = type, y = gene)) + theme_classic() +
   geom_point(aes(size = 100*-log10(pval), fill = coef), shape = 22,
              colour = ifelse(total_res_df$pval < 0.05, 'black', 'white')) +
@@ -348,4 +295,3 @@ ggplot(total_res_df, aes(x = type, y = gene)) + theme_classic() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1,size = 15),axis.text.y = element_text(hjust = 1,size = 15),
         axis.title.x = element_blank(),axis.title.y = element_blank()) 
 dev.off()
-
