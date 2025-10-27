@@ -148,25 +148,3 @@ CDX2 = plotBrowserTrack(ArchRProj = proj, groupBy = "celltype", plotSummary = c(
                         region = GRanges("chr13", IRanges(start = 27962137-3000, end = 27971139+3000)))
 CD24 = plotBrowserTrack(ArchRProj = proj, groupBy = "celltype", plotSummary = c('BulkTrack',"FeatureTrack", "GeneTrack"), scCellsMax = 20000, 
                         region = GRanges("chr6", IRanges(start = 106969831-3000, end = 106975627+3000)))
-
-######## Supple figure 2d
-pdf("/github/Figure/Supple/Fig2/d_Logic_track.pdf.pdf", width = 20, height = 10)
-grid.arrange(SLC39A1, SLC39A2, SLC39A3, SLC39A4, SLC39A5, SLC39A6, 
-             SLC39A8, SLC39A10, SLC39A14, CDX2, CD24, ncol = 4) 
-dev.off()
-
-
-SIGLEC10 = plotBrowserTrack(
-  ArchRProj = proj, 
-  groupBy = "celltype", 
-  geneSymbol = 'SIGLEC10',
-  upstream = 10000,
-  downstream = 10000,
-  plotSummary = c('BulkTrack',"FeatureTrack", "GeneTrack"),
-  scCellsMax = 20000
-)
-
-######## Supple figure 5b
-pdf("/github/Figure/Supple/Fig5/b_SIGLEC10.pdf", width = 16, height = 8)
-grid::grid.draw(SIGLEC10$SIGLEC10)
-dev.off()
