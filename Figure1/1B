@@ -82,7 +82,7 @@ Factor4[which(Factor4$type == 'negative')[c(1:8,10:17,23:40,51:52,67,70,71,76,79
 # write.csv(Factor4,'/github/model_data/MOFA/Factor4_annotation.csv')
 
 ######## Main figure 1c
-pdf("/github/Figure/Main/Fig1/c_Factor_annotation.pdf", width = 16, height = 8)
+pdf("/github/Figure/Main/Fig1/b_Factor_annotation.pdf", width = 16, height = 8)
 ggplot(Factor1, aes(x = coeff,y = -log10(fdr), colour = annot)) + xlim(-1,1) +
   geom_point(alpha = 1, size = 5) +  scale_color_manual(values=c("blue",'lightgoldenrod1',"grey90",'red')) + 
   theme_bw()  + 
