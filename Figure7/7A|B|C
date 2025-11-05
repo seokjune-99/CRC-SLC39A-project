@@ -1,19 +1,54 @@
+rm(list = ls())
+gc()
+
 library(factoextra)
 library(nnet)       
 library(ggsignif)
 library(ggplot2)
 library(ggpubr)
 library(ggVennDiagram)
+library(readxl)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(biomaRt)
+library(dplyr)
+library(tibble)
+library(dplyr)
+library(limma)
 
-expr = read.csv('/github/model_data/TCGA/COAD_tpm.csv', header = T, row.names = 1)
+convert_ensembl_to_symbol = function(mat) {
+  ensembl_ids = rownames(mat)
+  symbols = mapIds(org.Hs.eg.db, keys = ensembl_ids, column = "SYMBOL", keytype = "ENSEMBL", multiVals = "first")
+  na_ids = names(symbols[is.na(symbols)])
+  if (length(na_ids) > 0) {
+    mart   = useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+    bm_res = getBM(attributes = c("ensembl_gene_id", "hgnc_symbol"), filters = "ensembl_gene_id", values = na_ids, mart = mart)
+    if (nrow(bm_res) > 0) {
+      bm_res$hgnc_symbol[bm_res$hgnc_symbol == ""] = NA
+      idx = match(na_ids, bm_res$ensembl_gene_id)
+      symbols[na_ids] = bm_res$hgnc_symbol[idx]
+    }
+  }
+  keep = !is.na(symbols) & symbols != ""
+  if (!any(keep)) {
+    return(Matrix(0, nrow = 0, ncol = ncol(mat), sparse = TRUE))
+  }
+  mat = mat[keep, , drop = FALSE]
+  symbols = symbols[keep]
+  mat = cbind(symbols,mat)
+  colnames(mat)[1] = 'genesymbol'
+  return(mat)
+}
+
+expr = read.csv('/media/ssd2/seokjune/github/model_data/TCGA/COAD_tpm.csv', header = T, row.names = 1)
 expr = data.frame(t(expr))
-viper_score = read.csv('/github/model_data/TCGA/L_R_viper_score.csv', header = T, row.names = 1)
-clinic = read.csv('/github/model_data/TCGA/CDA_TCGA_COAD_mRNA_tpm_clinical_info.csv', header = T, row.names = 1)
+viper_score = read.csv('/media/ssd2/seokjune/github/model_data/TCGA/L_R_viper_score.csv', header = T, row.names = 1)
+clinic = read.csv('/media/ssd2/seokjune/github/model_data/TCGA/CDA_TCGA_COAD_mRNA_tpm_clinical_info.csv', header = T, row.names = 1)
 rownames(clinic) = gsub('-', '.', rownames(clinic))
 
-moMC_markers = read.csv('/github/singlecell_data/SG/data/Myeloid/moMC_markers.csv',row.names = 1, header = T)
-moDC_markers = read.csv('/github/singlecell_data/SG/data/Myeloid/moDC_markers.csv',row.names = 1, header = T)
-RTMC_markers = read.csv('/github/singlecell_data/SG/data/Myeloid/RTMC_markers.csv',row.names = 1, header = T)
+moMC_markers = read.csv('/media/ssd2/seokjune/github/singlecell_data/SG/data/Myeloid/moMC_markers.csv',row.names = 1, header = T)
+moDC_markers = read.csv('/media/ssd2/seokjune/github/singlecell_data/SG/data/Myeloid/moDC_markers.csv',row.names = 1, header = T)
+RTMC_markers = read.csv('/media/ssd2/seokjune/github/singlecell_data/SG/data/Myeloid/RTMC_markers.csv',row.names = 1, header = T)
 moMC_only = setdiff(rownames(moMC_markers),rownames(RTMC_markers))
 moDC_only = setdiff(rownames(moDC_markers),rownames(RTMC_markers))
 RTMC_only = setdiff(rownames(RTMC_markers),rownames(moMC_markers))  
@@ -22,7 +57,7 @@ moDC_markers = moDC_markers[moDC_only,]
 RTMC_markers = RTMC_markers[RTMC_only,]
 
 
-GOBP_list = readRDS('/github/model_data/Pathway/Geneset/GOBP_geneset.rds')
+GOBP_list = readRDS('/media/ssd2/seokjune/github/model_data/Pathway/Geneset/GOBP_geneset.rds')
 geneset = list()
 geneset[[1]] = rownames(moMC_markers)[1:50]
 geneset[[2]] = rownames(RTMC_markers)[1:50]
@@ -55,7 +90,7 @@ custom_colors = c("moMC-RTMC-" = "skyblue", "moMC+RTMC-" = "blue", "moMC-RTMC+" 
 
 
 ######## Main figure 7a
-pdf("/github/Figure/Main/Fig7/a_moMC_RTMC_plot.pdf", width = 6, height = 3)
+pdf("/media/ssd2/seokjune/github/Figure/Main/Fig7/a_moMC_RTMC_plot.pdf", width = 6, height = 3)
 fviz_cluster(km.res, total[,c('RTMC','moMC')], frame = FALSE, geom = "point",ellipse.type = "norm", stand = F,
              main = "TCGA sample (288)") +
   scale_shape_manual(values = rep(19, length(unique(km.res$cluster)))) +
@@ -66,7 +101,7 @@ dev.off()
 
 
 ######## Main figure 7b
-pdf("/github/Figure/Main/Fig7/b_CD24_SIGLEC10_score.pdf", width = 10, height = 5)
+pdf("/media/ssd2/seokjune/github/Figure/Main/Fig7/b_CD24_SIGLEC10_score.pdf", width = 10, height = 5)
 ggplot(total, aes(x = factor(cluster, levels = c("moMC-RTMC-", "moMC+RTMC-", "moMC-RTMC+", "moMC+RTMC+")), 
                   y = `CD24-SIGLEC10`, fill=cluster)) +
   geom_dotplot(binaxis='y', stackdir='center') + 
@@ -79,7 +114,7 @@ dev.off()
 
 
 ######## Main figure 7c
-pdf("/github/Figure/Main/Fig7/c_RTMC_moMC_phenotype.pdf", width = 12, height = 8)
+pdf("/media/ssd2/seokjune/github/Figure/Main/Fig7/c_RTMC_moMC_phenotype.pdf", width = 12, height = 8)
 ggscatter(total, x = 'moMC', y = 'KEGG.CD24', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
           conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
           color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
@@ -120,7 +155,7 @@ custom_colors = c("moDC-RTMC-" = "skyblue", "moDC+RTMC-" = "blue", "moDC-RTMC+" 
 
 
 ######## Supple figure 7b
-pdf("/github/Figure/Supple/Fig7/b_moDC_RTMC_plot.pdf", width = 6, height = 3)
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig7/b_moDC_RTMC_plot.pdf", width = 6, height = 3)
 fviz_cluster(km.res, total[,c('RTMC','moDC')], frame = FALSE, geom = "point",ellipse.type = "norm", stand = F,
              main = "TCGA sample (288)") +
   scale_shape_manual(values = rep(19, length(unique(km.res$cluster)))) +
@@ -131,7 +166,7 @@ dev.off()
 
 
 ######## Supple figure 7c
-pdf("/github/Figure/Supple/Fig7/c_CD24_SIGLEC10_score.pdf", width = 10, height = 5)
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig7/c_CD24_SIGLEC10_score.pdf", width = 10, height = 5)
 ggplot(total, aes(x = factor(cluster, levels = c("moDC-RTMC-", "moDC+RTMC-", "moDC-RTMC+", "moDC+RTMC+")), 
                   y = `CD24-SIGLEC10`, fill=cluster)) +
   geom_dotplot(binaxis='y', stackdir='center') + 
@@ -144,7 +179,7 @@ dev.off()
 
 
 ######## Supple figure 7d
-pdf("/github/Figure/Supple/Fig7/d_RTMC_moDC_phenotype.pdf", width = 12, height = 8)
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig7/d_RTMC_moDC_phenotype.pdf", width = 12, height = 8)
 ggscatter(total, x = 'moDC', y = 'KEGG.CD24', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
           conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
           color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
@@ -169,9 +204,9 @@ dev.off()
 
 
 # CPTAC
-expr = read.csv('/github/model_data/CPTAC/rsem.txt', header = T, row.names = 1, sep = '\t')
+expr = read.csv('/media/ssd2/seokjune/github/model_data/CPTAC/rsem.txt', header = T, row.names = 1, sep = '\t')
 expr = data.frame(t(expr))
-viper_score = read.csv('/github/model_data/CPTAC/CPTAC_L_R_viper_score.csv', header = T, row.names = 1)
+viper_score = read.csv('/media/ssd2/seokjune/github/model_data/CPTAC/CPTAC_L_R_viper_score.csv', header = T, row.names = 1)
 pathway = gsvaParam(exprData = t(expr),geneSets = geneset)
 pathway = gsva(pathway)
 pathway_res = data.frame(t(pathway))
@@ -192,8 +227,8 @@ km.res$cluster[which(km.res$cluster == 2)] = 'moMC-RTMC+'
 km.res$cluster[which(km.res$cluster == 3)] = 'moMC+RTMC+'
 custom_colors = c("moMC-RTMC-" = "skyblue", "moMC+RTMC-" = "blue", "moMC-RTMC+" = "chocolate", 'moMC+RTMC+' = 'red')
 
-######## Supple figure 7d
-pdf("/github/Figure/Supple/Fig7/f_CPTAC_moMC_RTMC_plot.pdf", width = 20, height = 6)
+######## Supple figure 7e
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig7/e_CPTAC_moMC_RTMC_plot.pdf", width = 20, height = 6)
 fviz_cluster(km.res, total[,c('RTMC','moMC')], frame = FALSE, geom = "point",ellipse.type = "norm", stand = F,
              main = "CPTAC sample (106)") +
   scale_shape_manual(values = rep(19, length(unique(km.res$cluster)))) +
@@ -238,8 +273,8 @@ km.res$cluster[which(km.res$cluster == 3)] = 'moDC-RTMC+'
 km.res$cluster[which(km.res$cluster == 2)] = 'moDC+RTMC+'
 custom_colors = c("moDC-RTMC-" = "skyblue", "moDC+RTMC-" = "blue", "moDC-RTMC+" = "chocolate", 'moDC+RTMC+' = 'red')
 
-######## Supple figure 7d
-pdf("/github/Figure/Supple/Fig7/f_CPTAC_moDC_RTMC_plot.pdf", width = 20, height = 6)
+######## Supple figure 7e
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig7/e_CPTAC_moDC_RTMC_plot.pdf", width = 20, height = 6)
 fviz_cluster(km.res, total[,c('RTMC','moDC')], frame = FALSE, geom = "point",ellipse.type = "norm", stand = F,
              main = "CPTAC sample (106)") +
   scale_shape_manual(values = rep(19, length(unique(km.res$cluster)))) +
@@ -272,142 +307,134 @@ dev.off()
 
 
 # ICI
-expr = read.table('/github/model_data/ICI/GSE235919_TPM.txt', header = T, row.names = 1)
-clinic = read_xlsx('/github/model_data/ICI/GSE235919_clinic.xlsx')
-clinic = data.frame(clinic)
-clinic$Sample = gsub("^(\\d+BM)(\\d+)-.*$", "X\\1.\\2", clinic$Sample)
-pathway = gsvaParam(exprData = data.matrix(expr),geneSets = geneset)
-pathway_res = gsva(pathway)
-pathway_res = data.frame(pathway_res)
+MSS1 = read.table('/media/ssd2/seokjune/github/model_data/ICI/GSE179351_merged_counts.tsv', header = T, row.names = 1)
+MSS2 = read.table('/media/ssd2/seokjune/github/model_data/ICI/GSE235919_merged_counts.tsv', header = T, row.names = 1)
+MSS3 = read.csv('/media/ssd2/seokjune/github/model_data/ICI/GSE302922_Tissue_count_coding.csv', header = T, row.names = 1)
+MSI1 = read.table('/media/ssd2/seokjune/github/model_data/ICI/ImmunoMSI_RawCounts.tsv', header = T, row.names = 1)
+MSI2 = read.table('/media/ssd2/seokjune/github/model_data/ICI/Nipicol_RawCounts.tsv', header = T, row.names = 1)
 
-set.seed(0)
-km.res = kmeans(t(pathway_res)[,c('RTMC','moMC')],4, nstart = 25)
-cluster = km.res$cluster
-cluster[which(cluster == 2)] = 'moMC-RTMC-'
-cluster[which(cluster == 1)] = 'moMC+RTMC-'
-cluster[which(cluster == 3)] = 'moMC+RTMC+'
-cluster[which(cluster == 4)] = 'moMC+RTMC+'
-km.res$cluster[which(km.res$cluster == 2)] = 'moMC-RTMC-'
-km.res$cluster[which(km.res$cluster == 1)] = 'moMC+RTMC-'
-km.res$cluster[which(km.res$cluster == 3)] = 'moMC+RTMC+'
-km.res$cluster[which(km.res$cluster == 4)] = 'moMC+RTMC+'
-custom_colors = c("moMC-RTMC-" = "skyblue", "moMC+RTMC-" = "blue", "moMC-RTMC+" = "chocolate", 'moMC+RTMC+' = 'red')
+rownames(MSS1) = sub("\\..*$", "", rownames(MSS1))
+rownames(MSS2) = sub("\\..*$", "", rownames(MSS2))
+MSS3 = MSS3[,-c(1:2)]
+MSS1 = convert_ensembl_to_symbol(MSS1)
+MSS2 = convert_ensembl_to_symbol(MSS2)
+MSS3 = convert_ensembl_to_symbol(MSS3)
+MSI1 = convert_ensembl_to_symbol(MSI1)
+MSI2 = convert_ensembl_to_symbol(MSI2)
 
-total_data = data.frame(t(pathway_res))
-total_data[,'Sample'] = rownames(total_data)
-total_data[,'cluster'] = as.character(km.res$cluster)
-total_data[,'SIGLEC10'] = as.numeric(expr['SIGLEC10',])
-total_data = merge(clinic,total_data,by = 'Sample',all.x = T)
+MSS1 = MSS1 %>% group_by(genesymbol) %>% 
+  summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE)), .groups = "drop") %>%
+  column_to_rownames("genesymbol")
+MSS2 = MSS2 %>% group_by(genesymbol) %>% 
+  summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE)), .groups = "drop") %>%
+  column_to_rownames("genesymbol")
+MSS3 = MSS3 %>% group_by(genesymbol) %>% 
+  summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE)), .groups = "drop") %>%
+  column_to_rownames("genesymbol")
+MSI1 = MSI1 %>% group_by(genesymbol) %>% 
+  summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE)), .groups = "drop") %>%
+  column_to_rownames("genesymbol")
+MSI2 = MSI2 %>% group_by(genesymbol) %>% 
+  summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE)), .groups = "drop") %>%
+  column_to_rownames("genesymbol")
 
-fviz_cluster(km.res, t(pathway_res)[,c('RTMC','moMC')], frame = FALSE, geom = "point",ellipse.type = "norm", stand = F,
-             main = "ICI sample (34)") +
-  scale_shape_manual(values = rep(19, length(unique(km.res$cluster)))) +
-  scale_color_manual(values = custom_colors) +
-  scale_fill_manual(values = custom_colors) +
-  theme_classic() + 
-  ggscatter(total_data, x = 'moMC', y = 'negative.regulation.of.immune.response', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
-            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
-            color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
-                                                               "moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) +
-  labs(x = "moMC score", y = "negative regulation of immune response") + 
-  ggscatter(total_data, x = 'moMC', y = 'negative.regulation.of.phagocytosis', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
-            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
-            color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
-                                                               "moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) +
-  labs(x = "moMC score", y = "negative regulation of phagocytosis") + theme(legend.position = "none") +
-  ggscatter(total_data, x = 'RTMC', y = 'regulation.of.cell.cell.adhesion', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
-            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
-            color = 'cluster') + scale_color_manual(values = c("moMC-RTMC-" = "skyblue", "moMC-RTMC+" = "chocolate",
-                                                               "moMC+RTMC-" = "blue", "moMC+RTMC+" = "red")) +
-  labs(x = "RTMC score", y = "regulation of cell-cell adhesion") + theme(legend.position = "none") +
-  plot_layout(nrow = 1)
+MSS1_clinic = readxl::read_xlsx('/home/seokjune2/SLC/ICI/GSE179351_clinic.xlsx')
+MSS2_clinic = readxl::read_xlsx('/home/seokjune2/SLC/ICI/GSE235919_clinic.xlsx')
+MSS3_clinic = readxl::read_xlsx('/home/seokjune2/SLC/ICI/GSE302922_clinic.xlsx')
+MSI1_clinic = readxl::read_xlsx('/home/seokjune2/SLC/ICI/ImmunoMSI_clinic.xlsx')
+MSI2_clinic = readxl::read_xlsx('/home/seokjune2/SLC/ICI/Nipicol_clinic.xlsx')
+
+MSS1_clinic = MSS1_clinic[-which(is.na(MSS1_clinic$Response)),]
+MSS1 = MSS1[,MSS1_clinic$Run]
+MSS2 = MSS2[,MSS2_clinic$Run]
+MSS3 = MSS3[,MSS3_clinic$Library]
+
+MSI1_clinic = MSI1_clinic[-which(is.na(MSI1_clinic$Response)),]
+MSI1 = MSI1[,grepl("T_", colnames(MSI1))]
+colnames(MSI1) = sub("\\..*?(\\d+T).*", "-\\1", colnames(MSI1))
+MSI1 = MSI1[,MSI1_clinic$ID]
+
+MSI2_clinic = MSI2_clinic[-which(is.na(MSI2_clinic$Response)),]
+MSI2 = MSI2[,grepl("TSFP", colnames(MSI2))]
+colnames(MSI2) = sub("^.*?(IMSI)(\\d{4})TSFP.*$", "\\1_\\2", colnames(MSI2))
+MSI2_clinic = MSI2_clinic[which(MSI2_clinic$ID %in% colnames(MSI2)),]
+MSI2 = MSI2[,MSI2_clinic$ID]
 
 
+common_genes = Reduce(intersect, list(rownames(MSS1), rownames(MSS2), rownames(MSS3),
+                                      rownames(MSI1), rownames(MSI2)))
+mat_list = list(MSS1, MSS2, MSS3, MSI1, MSI2)
+mat_list = lapply(mat_list, function(x) x[common_genes, ])
+names(mat_list) = c("MSS1","MSS2","MSS3","MSI1","MSI2")
+for (i in seq_along(mat_list)) {
+  colnames(mat_list[[i]]) = paste0(names(mat_list)[i], "_", colnames(mat_list[[i]]))
+}
+merged = do.call(cbind, mat_list)
+log_mat = log2(merged + 1)
+pca = prcomp(t(log_mat), scale. = F)
+batch = sub("_.*", "", colnames(log_mat))
+pca_df = as.data.frame(pca$x[, 1:2])
+pca_df$batch = batch
 
-plot_df = total_data
-plot_df[,'type'] = 'R'
-plot_df[which(plot_df$Recist == 'Stable disease'),'type'] = 'NR'
+B_batch = ggplot(pca_df, aes(PC1, PC2, color = batch)) + geom_point(size = 3, alpha = 0.7) + theme_classic() + 
+  labs(x = paste0("PC1 (", round(summary(pca)$importance[2,1]*100,1), "%)"),
+       y = paste0("PC2 (", round(summary(pca)$importance[2,2]*100,1), "%)"))
 
-######## Main figure 7d
-pdf("/github/Figure/Main/Fig7/d_ICI_response.pdf", width = 6, height = 6)
-ggplot(plot_df,aes(x = cluster,fill = type)) + 
-  geom_bar(position = "fill") + scale_fill_manual(values = c("NR" = "#E74C3C", "R" = "#3498DB")) + theme_bw() +
-  labs(x = "Cluster", y = "Proportion", fill = "Response Type", title = "Response Proportion by Cluster") 
+corrected = removeBatchEffect(log_mat, batch = batch)
+pca = prcomp(t(corrected), scale. = F)
+pca_df = data.frame(pca$x[, 1:2], batch = batch)
+A_batch = ggplot(pca_df, aes(PC1, PC2, color = batch)) + geom_point(size = 3, alpha = 0.7) + theme_classic() + 
+  labs(x = paste0("PC1 (", round(summary(pca)$importance[2,1]*100,1), "%)"),
+       y = paste0("PC2 (", round(summary(pca)$importance[2,2]*100,1), "%)"))
+
+######## Supple figure 7f
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig7/f_ICI_batcheffectremoval.pdf", width = 12, height = 4)
+B_batch + A_batch
 dev.off()
 
-table(plot_df$type,plot_df$cluster)
-x = matrix(c(9, 9, 1, 9), nrow = 2, byrow = TRUE)
-colnames(x) = c("NR", "R")
-rownames(x) = c("moMC+RTMC+", "moMC-RTMC-")
-fisher.test(x)
 
+MSS1_filtered = data.frame(t(corrected[,grep('MSS1',colnames(corrected))]))
+MSS1_filtered[,'Response'] = MSS1_clinic$Response
+MSS1_filtered[which(MSS1_filtered$Response == 'PR'),'Response'] = "R"
+MSS1_filtered[which(MSS1_filtered$Response == 'PD'),'Response'] = "NR"
+rownames(MSS1_filtered) = paste0('MSS1','_',1:nrow(MSS1_filtered))
 
-set.seed(0)
-km.res = kmeans(t(pathway_res)[,c('RTMC','moDC')],4, nstart = 25)
-cluster = km.res$cluster
-cluster[which(cluster == 2)] = 'moDC-RTMC-'
-cluster[which(cluster == 1)] = 'moDC+RTMC-'
-cluster[which(cluster == 3)] = 'moDC+RTMC+'
-cluster[which(cluster == 4)] = 'moDC+RTMC+'
-km.res$cluster[which(km.res$cluster == 2)] = 'moDC-RTMC-'
-km.res$cluster[which(km.res$cluster == 1)] = 'moDC+RTMC-'
-km.res$cluster[which(km.res$cluster == 3)] = 'moDC+RTMC+'
-km.res$cluster[which(km.res$cluster == 4)] = 'moDC+RTMC+'
-custom_colors = c("moDC-RTMC-" = "skyblue", "moDC+RTMC-" = "blue", "moDC-RTMC+" = "chocolate", 'moDC+RTMC+' = 'red')
-total_data = data.frame(t(pathway_res))
-total_data[,'Sample'] = rownames(total_data)
-total_data[,'cluster'] = as.character(km.res$cluster)
-total_data[,'SIGLEC10'] = as.numeric(expr['SIGLEC10',])
-total_data = merge(clinic,total_data,by = 'Sample',all.x = T)
+MSS2_filtered = data.frame(t(corrected[,grep('MSS2',colnames(corrected))]))
+MSS2_filtered[,'Response'] = MSS2_clinic$Response
+MSS2_filtered[which(MSS2_filtered$Response == 'PR' | MSS2_filtered$Response == 'CR'),'Response'] = "R"
+MSS2_filtered[which(MSS2_filtered$Response == 'SD'),'Response'] = "NR"
+rownames(MSS2_filtered) = paste0('MSS2','_',1:nrow(MSS2_filtered))
 
-fviz_cluster(km.res, t(pathway_res)[,c('RTMC','moDC')], frame = FALSE, geom = "point",ellipse.type = "norm", stand = F,
-             main = "ICI sample (34)") +
-  scale_shape_manual(values = rep(19, length(unique(km.res$cluster)))) +
-  scale_color_manual(values = custom_colors) +
-  scale_fill_manual(values = custom_colors) +
-  theme_classic() + 
-  ggscatter(total_data, x = 'moDC', y = 'negative.regulation.of.immune.response', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
-            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
-            color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
-                                                               "moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) +
-  labs(x = "moDC score", y = "negative regulation of immune response") + 
-  ggscatter(total_data, x = 'moDC', y = 'negative.regulation.of.phagocytosis', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
-            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
-            color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
-                                                               "moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) +
-  labs(x = "moDC score", y = "negative regulation of phagocytosis") + theme(legend.position = "none") +
-  ggscatter(total_data, x = 'RTMC', y = 'regulation.of.cell.cell.adhesion', add = 'reg.line', add.params = list(color = 'red', fill = 'grey'),
-            conf.int = TRUE, cor.method = 'pearson', cor.coef = TRUE, cor.coeff.args = list(label.sep = "\n", size = 4.5),
-            color = 'cluster') + scale_color_manual(values = c("moDC-RTMC-" = "skyblue", "moDC-RTMC+" = "chocolate",
-                                                               "moDC+RTMC-" = "blue", "moDC+RTMC+" = "red")) +
-  labs(x = "RTMC score", y = "regulation of cell-cell adhesion") + theme(legend.position = "none") +
-  plot_layout(nrow = 1)
+MSS3_filtered = data.frame(t(corrected[,grep('MSS3',colnames(corrected))]))
+MSS3_filtered[,'Response'] = MSS3_clinic$Response
+MSS3_filtered[which(MSS3_filtered$Response == 'PR'),'Response'] = "R"
+MSS3_filtered[which(MSS3_filtered$Response == 'nonPR'),'Response'] = "NR"
+rownames(MSS3_filtered) = paste0('MSS3','_',1:nrow(MSS3_filtered))
+
+MSI1_filtered = data.frame(t(corrected[,grep('MSI1',colnames(corrected))]))
+MSI1_filtered[,'Response'] = MSI1_clinic$Response
+MSI1_filtered[which(MSI1_filtered$Response == 'PR' | MSI1_filtered$Response == 'CR'),'Response'] = "R"
+MSI1_filtered[which(MSI1_filtered$Response == 'PD' | MSI1_filtered$Response == 'SD'),'Response'] = "NR"
+rownames(MSI1_filtered) = paste0('MSI1','_',1:nrow(MSI1_filtered))
+
+MSI2_filtered = data.frame(t(corrected[,grep('MSI2',colnames(corrected))]))
+MSI2_filtered[,'Response'] = MSI2_clinic$Response
+MSI2_filtered[which(MSI2_filtered$Response == 'PR' | MSI2_filtered$Response == 'CR'),'Response'] = "R"
+MSI2_filtered[which(MSI2_filtered$Response == 'PD' | MSI2_filtered$Response == 'SD'),'Response'] = "NR"
+rownames(MSI2_filtered) = paste0('MSI2','_',1:nrow(MSI2_filtered))
+
+write.csv(MSS1_filtered,'/home/seokjune2/SLC/ICI/model_data/MSS1.csv')
+write.csv(MSS2_filtered,'/home/seokjune2/SLC/ICI/model_data/MSS2.csv')
+write.csv(MSS3_filtered,'/home/seokjune2/SLC/ICI/model_data/MSS3.csv')
+write.csv(MSI1_filtered,'/home/seokjune2/SLC/ICI/model_data/MSI1.csv')
+write.csv(MSI2_filtered,'/home/seokjune2/SLC/ICI/model_data/MSI2.csv')
 
 
 
-
-plot_df = total_data
-plot_df[,'type'] = 'R'
-plot_df[which(plot_df$Recist == 'Stable disease'),'type'] = 'NR'
-
-######## Supple figure 7e
-pdf("/github/Figure/Supple/Fig7/e_ICI_moDC_response.pdf", width = 6, height = 6)
-ggplot(plot_df,aes(x = cluster,fill = type)) + 
-  geom_bar(position = "fill") + scale_fill_manual(values = c("NR" = "#E74C3C", "R" = "#3498DB")) + theme_bw() +
-  labs(x = "Cluster", y = "Proportion", fill = "Response Type", title = "Response Proportion by Cluster") 
-dev.off()
-
-table(plot_df$type,plot_df$cluster)
-x = matrix(c(8, 8, 1, 10), nrow = 2, byrow = TRUE)
-colnames(x) = c("NR", "R")
-rownames(x) = c("moDC+RTMC+", "moDC-RTMC-")
-fisher.test(x)
-
-
-
-moMC_markers = read.csv('/github/singlecell_data/SG/data/Myeloid/moMC_markers.csv',row.names = 1, header = T)
-moDC_markers = read.csv('/github/singlecell_data/SG/data/Myeloid/moDC_markers.csv',row.names = 1, header = T)
-RTMC_markers = read.csv('/github/singlecell_data/SG/data/Myeloid/RTMC_markers.csv',row.names = 1, header = T)
+# Supple figure 7a
+moMC_markers = read.csv('/media/ssd2/seokjune/github/singlecell_data/SG/data/Myeloid/moMC_markers.csv',row.names = 1, header = T)
+moDC_markers = read.csv('/media/ssd2/seokjune/github/singlecell_data/SG/data/Myeloid/moDC_markers.csv',row.names = 1, header = T)
+RTMC_markers = read.csv('/media/ssd2/seokjune/github/singlecell_data/SG/data/Myeloid/RTMC_markers.csv',row.names = 1, header = T)
 moMC_only = setdiff(rownames(moMC_markers),rownames(RTMC_markers))
 moDC_only = setdiff(rownames(moDC_markers),rownames(RTMC_markers))
 RTMC_only = setdiff(rownames(RTMC_markers),rownames(moMC_markers))  
@@ -419,7 +446,7 @@ marker_list[['moMC marker genes']] = rownames(moMC_markers)[1:50]
 marker_list[['moDC marker genes']] = rownames(moDC_markers)[1:50]
 marker_list[['RTMC marker genes']] = rownames(RTMC_markers)[1:50]
 
-GOBP_list = readRDS('/github/model_data/Pathway/Geneset/GOBP_geneset.rds')
+GOBP_list = readRDS('/media/ssd2/seokjune/github/model_data/Pathway/Geneset/GOBP_geneset.rds')
 Phago = GOBP_list[['negative regulation of phagocytosis']]
 Immune = GOBP_list[['negative regulation of immune response']]
 Adhesion = GOBP_list[['regulation of cell-cell adhesion']]
@@ -442,9 +469,15 @@ Adhesion_list[['RTMC marker genes']] = rownames(RTMC_markers)[1:50]
 Adhesion_list[['regulation of cell-cell adhesion']] = Adhesion
 
 ######## Supple figure 7a
-pdf("/github/Figure/Supple/Fig7/a_Marker_target_Diagram.pdf", width = 12, height = 8)
+pdf("/media/ssd2/seokjune/github/Figure/Supple/Fig7/a_Marker_target_Diagram.pdf", width = 12, height = 8)
 ggVennDiagram(marker_list) + scale_fill_gradient(low = "#F4FAFE", high = "#4981BF") + coord_flip() +
   ggVennDiagram(path_list) + scale_fill_gradient(low = "#F4FAFE", high = "#4981BF") + coord_flip() + 
   ggVennDiagram(Marker.Path_list) + scale_fill_gradient(low = "#F4FAFE", high = "#4981BF") + coord_flip() + 
   ggVennDiagram(Adhesion_list) + scale_fill_gradient(low = "#F4FAFE", high = "#4981BF") + coord_flip() 
 dev.off()
+
+
+
+
+
+
