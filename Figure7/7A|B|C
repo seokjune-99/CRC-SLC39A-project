@@ -338,11 +338,11 @@ MSI2 = MSI2 %>% group_by(genesymbol) %>%
   summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE)), .groups = "drop") %>%
   column_to_rownames("genesymbol")
 
-MSS1_clinic = readxl::read_xlsx('/home/seokjune2/SLC/ICI/GSE179351_clinic.xlsx')
-MSS2_clinic = readxl::read_xlsx('/home/seokjune2/SLC/ICI/GSE235919_clinic.xlsx')
-MSS3_clinic = readxl::read_xlsx('/home/seokjune2/SLC/ICI/GSE302922_clinic.xlsx')
-MSI1_clinic = readxl::read_xlsx('/home/seokjune2/SLC/ICI/ImmunoMSI_clinic.xlsx')
-MSI2_clinic = readxl::read_xlsx('/home/seokjune2/SLC/ICI/Nipicol_clinic.xlsx')
+MSS1_clinic = readxl::read_xlsx('/media/ssd2/seokjune/github/model_data/ICI/GSE179351_clinic.xlsx')
+MSS2_clinic = readxl::read_xlsx('/media/ssd2/seokjune/github/model_data/ICI/GSE235919_clinic.xlsx')
+MSS3_clinic = readxl::read_xlsx('/media/ssd2/seokjune/github/model_data/ICI/GSE302922_clinic.xlsx')
+MSI1_clinic = readxl::read_xlsx('/media/ssd2/seokjune/github/model_data/ICI/ImmunoMSI_clinic.xlsx')
+MSI2_clinic = readxl::read_xlsx('/media/ssd2/seokjune/github/model_data/ICI/Nipicol_clinic.xlsx')
 
 MSS1_clinic = MSS1_clinic[-which(is.na(MSS1_clinic$Response)),]
 MSS1 = MSS1[,MSS1_clinic$Run]
@@ -423,11 +423,11 @@ MSI2_filtered[which(MSI2_filtered$Response == 'PR' | MSI2_filtered$Response == '
 MSI2_filtered[which(MSI2_filtered$Response == 'PD' | MSI2_filtered$Response == 'SD'),'Response'] = "NR"
 rownames(MSI2_filtered) = paste0('MSI2','_',1:nrow(MSI2_filtered))
 
-write.csv(MSS1_filtered,'/home/seokjune2/SLC/ICI/model_data/MSS1.csv')
-write.csv(MSS2_filtered,'/home/seokjune2/SLC/ICI/model_data/MSS2.csv')
-write.csv(MSS3_filtered,'/home/seokjune2/SLC/ICI/model_data/MSS3.csv')
-write.csv(MSI1_filtered,'/home/seokjune2/SLC/ICI/model_data/MSI1.csv')
-write.csv(MSI2_filtered,'/home/seokjune2/SLC/ICI/model_data/MSI2.csv')
+write.csv(MSS1_filtered,'/media/ssd2/seokjune/github/model_data/ICI/model_data/MSS1.csv')
+write.csv(MSS2_filtered,'/media/ssd2/seokjune/github/model_data/ICI/model_data/MSS2.csv')
+write.csv(MSS3_filtered,'/media/ssd2/seokjune/github/model_data/ICI/model_data/MSS3.csv')
+write.csv(MSI1_filtered,'/media/ssd2/seokjune/github/model_data/ICI/model_data/MSI1.csv')
+write.csv(MSI2_filtered,'/media/ssd2/seokjune/github/model_data/ICI/model_data/MSI2.csv')
 
 
 
