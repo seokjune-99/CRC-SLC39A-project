@@ -10,14 +10,6 @@ library(rhandsontable)
 
 addArchRGenome("hg38")
 
-# inputFiles = c(
-#   "CRC1" = "/github/singlecell_data/ATAC/GSM6058842_CRC-1-8810-D_20200917_fragments.tsv.gz",
-#   "CRC3" = "/github/singlecell_data/ATAC/GSM6058844_CRC-3-11773-D_20200917_fragments.tsv.gz",
-#   "CRC4" = "/github/singlecell_data/ATAC/GSM6058845_CRC-4-8456-D_20200917_fragments.tsv.gz"
-# )
-# ArrowFiles = createArrowFiles(inputFiles = inputFiles,sampleNames = names(inputFiles), filterFrags = 3000,)
-# doubScores = addDoubletScores(ArrowFiles, k = 10, knnMethod = "UMAP", LSIMethod = 1)
-
 proj = ArchRProject(
   ArrowFiles = c('/github/singlecell_data/ATAC/CRC1.arrow',
                  '/github/singlecell_data/ATAC/CRC3.arrow',
