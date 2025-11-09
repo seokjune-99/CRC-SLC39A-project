@@ -9,10 +9,6 @@ library(nichenetr)
 library(NICHES)
 library(reshape2)
 
-C1 = readRDS('/github/spatial_data/Interaction/C1_processed_both_pathway_interactions.rds')
-C2 = readRDS('/github/spatial_data/Interaction/C2_processed_both_pathway_interactions.rds')
-C3 = readRDS('/github/spatial_data/Interaction/C3_processed_both_pathway_interactions.rds')
-C4 = readRDS('/github/spatial_data/Interaction/C4_processed_both_pathway_interactions.rds')
 
 C1 = readRDS('/github/spatial_data/Interaction/C1_final.rds')
 C2 = readRDS('/github/spatial_data/Interaction/C2_final.rds')
