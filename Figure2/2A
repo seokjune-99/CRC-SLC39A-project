@@ -2,9 +2,9 @@ getwd()
 rm(list = ls())
 gc()
 
-expr = read.csv('/media/ssd2/seokjune/github/model_data/TCGA/COAD_tpm.csv', header = T, row.names = 1)
-arc = read.csv('/media/ssd2/seokjune/github/model_data/Archetype/arc_data.csv', header = T, row.names = 1)
-pro = read.csv('/media/ssd2/seokjune/github/model_data/Viper/coad_protein_activity.csv',header = T, row.names = 1)
+expr = read.csv('/github/model_data/TCGA/COAD_tpm.csv', header = T, row.names = 1)
+arc = read.csv('/github/model_data/Archetype/arc_data.csv', header = T, row.names = 1)
+pro = read.csv('/github/model_data/Viper/coad_protein_activity.csv',header = T, row.names = 1)
 pro = data.frame(t(pro))
 
 
